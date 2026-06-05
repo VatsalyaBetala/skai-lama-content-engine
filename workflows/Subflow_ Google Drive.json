@@ -1,0 +1,4252 @@
+{
+  "name": "Subflow: Google Drive",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\n// If no items or date fields missing, pass everything through\nconst recentFiles = items.filter(item => {\n  // No date fields returned by Google Drive node — pass all through\n  if (!item.json.modifiedTime && !item.json.createdTime) return true;\n  \n  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);\n  const modified = new Date(item.json.modifiedTime || item.json.createdTime);\n  return modified > sevenDaysAgo;\n});\n\nif (recentFiles.length === 0) {\n  return [{ \n    json: { \n      id: null, \n      name: 'No meeting notes found this week'\n    } \n  }];\n}\n\nreturn recentFiles.map(f => ({ json: f.json }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -896,
+        368
+      ],
+      "id": "dd439f56-48cc-4805-aa0e-f972c9132e25",
+      "name": "GD: Filter 7 Days"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -448,
+        368
+      ],
+      "id": "714b03ee-2a96-4d88-a446-b031fa2827fa",
+      "name": "GD: Loop Over Files"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0348e6c8-2d1e-4518-bc80-f8d9701dc17f",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -224,
+        288
+      ],
+      "id": "8f471f6f-00f8-4c95-8568-42bc20bc91a9",
+      "name": "GD: Has File ID?"
+    },
+    {
+      "parameters": {
+        "url": "=https://docs.googleapis.com/v1/documents/{{ $json.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        0,
+        192
+      ],
+      "id": "e0dd2e91-7406-47aa-907c-4eb372246db3",
+      "name": "GD: HTTP GET Doc Content",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "iXdDqqlulteSQxBS",
+          "name": "Google Drive account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const doc = $input.first().json;\nconst title = doc.title || 'Untitled Meeting Notes';\nconst content = doc.body?.content || [];\n\nlet text = '';\n\nfor (const block of content) {\n  // Handle paragraphs\n  if (block.paragraph) {\n    const elements = block.paragraph.elements || [];\n    for (const el of elements) {\n      if (el.textRun?.content) {\n        text += el.textRun.content;\n      }\n    }\n  }\n  // Handle tables\n  if (block.table) {\n    const rows = block.table.tableRows || [];\n    for (const row of rows) {\n      const cells = row.tableCells || [];\n      const cellTexts = cells.map(cell => {\n        return (cell.content || [])\n          .flatMap(b => (b.paragraph?.elements || [])\n          .map(el => el.textRun?.content || ''))\n          .join('').trim();\n      });\n      text += cellTexts.join(' | ') + '\\n';\n    }\n  }\n}\n\n// Clean up whitespace\nconst cleanText = text.replace(/\\n{3,}/g, '\\n\\n').trim();\n\n// Limit to 3000 chars per doc\nconst truncated = cleanText.length > 3000\n  ? cleanText.substring(0, 8000) + '\\n[truncated...]'\n  : cleanText;\n\nreturn [{\n  json: {\n    title,\n    content: truncated,\n    charCount: cleanText.length,\n    docId: doc.documentId\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        368
+      ],
+      "id": "fdf71780-6c1e-4014-a122-ea4b54b13780",
+      "name": "GD: Parse Doc Content"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9cac3385-a402-405c-b482-e7d8adad27fe",
+              "name": "content ",
+              "value": "No meeting notes found this week",
+              "type": "string"
+            },
+            {
+              "id": "f566ea91-a1a6-4a7f-af04-5fbe0e50f829",
+              "name": "title ",
+              "value": "No meeting notes",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        384
+      ],
+      "id": "30db1df8-21fc-4ac5-af81-ce2b36ee2051",
+      "name": "GD: No Files Placeholder"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nif (!items.length || items[0].json.content === 'No meeting notes found this week.') {\n  return [{\n    json: {\n      meetingNotesContext: '=== Meeting Notes (Last 7 days) ===\\nNo meeting notes found this week.'\n    }\n  }];\n}\n\nlet collated = '=== Meeting Notes (Last 7 days) ===\\n';\n\nfor (const item of items) {\n  const title = item.json.title || 'Untitled';\n  const content = item.json.content || '';\n\n  if (content) {\n    collated += `\\n--- ${title} ---\\n${content}\\n`;\n  }\n}\n\nreturn [{\n  json: {\n    meetingNotesContext: collated,\n    totalDocs: items.filter(i => i.json.docId).length\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        0
+      ],
+      "id": "4365296c-7880-4d9b-b5bb-62d181af02a8",
+      "name": "GD: Collate Meeting Notes"
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "ts7DaysAgo",
+              "type": "number"
+            },
+            {
+              "name": "dateToday",
+              "type": "number"
+            },
+            {
+              "name": "dateLastMonday"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1344,
+        368
+      ],
+      "id": "d5e807c3-153c-498c-ae6d-60f94e1b1753",
+      "name": "Input: Receive Trigger"
+    },
+    {
+      "parameters": {
+        "url": "=https://www.googleapis.com/drive/v3/files?q=name+contains+%22Notes+by+Gemini%22+and+modifiedTime+%3E+%27{{ DateTime.now().minus({days: 3}).toFormat('yyyy-MM-dd') }}T00%3A00%3A00%27+and+trashed%3Dfalse&fields=files(id,name,modifiedTime,createdTime)&pageSize=20&orderBy=modifiedTime+desc",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1120,
+        368
+      ],
+      "id": "18911394-7b1e-4b72-9ff5-4a7c70b3a32a",
+      "name": "GD: Search Meeting Notes",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "iXdDqqlulteSQxBS",
+          "name": "Google Drive account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst files = data.files || [];\n\nif (files.length === 0) {\n  return [{\n    json: {\n      id: null,\n      name: 'No new meeting notes found',\n      modifiedTime: null\n    }\n  }];\n}\n\nconsole.log(`Found ${files.length} meeting notes`);\n\nreturn files.map(f => ({ json: f }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -672,
+        368
+      ],
+      "id": "0ca3c8d2-cee8-486a-84cb-202e6b1dd8d7",
+      "name": "GD: Parse Files"
+    },
+    {
+      "parameters": {
+        "url": "https://api.notion.com/v1/blocks/3667013d07a48168b948d0fee1677a4e/children?page_size=100",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "b904a438-3492-460b-b076-51c054be3628",
+      "name": "GD: Fetch Collector Prompt",
+      "credentials": {
+        "notionApi": {
+          "id": "bJLSXb7rDb4zr6O5",
+          "name": "Notion - Vatsalya"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const blocks = $('GD: Fetch Collector Prompt').first().json.results || [];\nconst collatedNotes = $('GD: Collate Meeting Notes').first().json;\nconst trigger = $('Input: Receive Trigger').first().json;\n\n// Extract Collector Base Prompt from Notion\nlet collectorPrompt = '';\nlet inCollectorSection = false;\n\nfor (const block of blocks) {\n  if (block.type === 'heading_2') {\n    const text = block.heading_2?.rich_text?.[0]?.plain_text || '';\n    if (text.includes('Collector Base Prompt')) {\n      inCollectorSection = true;\n      continue;\n    }\n    if (inCollectorSection) break;\n  }\n  if (inCollectorSection && block.type === 'code') {\n    collectorPrompt = block.code?.rich_text?.map(r => r.plain_text).join('') || '';\n    break;\n  }\n}\n\nif (!collectorPrompt) {\n  collectorPrompt = 'ERROR: Collector Base Prompt not found in Prompt Library';\n}\n\n// Get raw content and file map\nconst rawContent = collatedNotes.meetingNotesContext || 'No meeting notes found.';\nlet formattedContent = rawContent;\n\nconst fileItems = $('GD: Parse Files').all();\nconst fileMap = {};\nfor (const file of fileItems) {\n  const title = file.json.name || '';\n  const id = file.json.id || '';\n  if (id) {\n    fileMap[title] = `https://docs.google.com/document/d/${id}/edit`;\n  }\n}\n\n// Inject URLs into collated content\nfor (const [title, url] of Object.entries(fileMap)) {\n  formattedContent = formattedContent.replace(\n    `--- ${title} ---`,\n    `--- ${title} ---\\nSource URL: ${url}`\n  );\n}\n\nconst totalDocs = collatedNotes.totalDocs || 0;\nconst dateToday = trigger.dateToday || new Date().toISOString().split('T')[0];\nconst dateLastMonday = trigger.dateLastMonday || dateToday;\n\nconst finalPrompt = collectorPrompt\n  .replace('[raw source data injected here]', formattedContent)\n  .replace('[source_name]', 'google_drive');\n\nreturn [{\n  json: {\n    userMessage: finalPrompt,\n    totalDocs,\n    dateToday,\n    dateLastMonday\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "f48c9e42-ec69-43f8-9485-a1419ca2de77",
+      "name": "GD: Build Collector Context"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "application-content",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 4000,\n  \"messages\": [{\n    \"role\": \"user\",\n    \"content\": $('GD: Build Collector Context').first().json.userMessage\n  }]\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        448,
+        0
+      ],
+      "id": "af18d5a1-171a-44b6-a13a-fa8ac34b43b2",
+      "name": "GD: Claude Collector",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "feoW1VBDikCNaQ3D",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst raw = response.content?.[0]?.text || '';\nconst context = $('GD: Build Collector Context').first().json;\n\nconst clean = raw\n  .replace(/^```json\\n?/, '')\n  .replace(/\\n?```$/, '')\n  .trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(clean);\n} catch(e) {\n  parsed = {\n    source: 'google_drive',\n    signals: [],\n    itemCount: 0,\n    dateRange: `${context.dateLastMonday} to ${context.dateToday}`,\n    status: 'error',\n    error: e.message\n  };\n}\n\nconst output = {\n  source: parsed.source || 'google_drive',\n  signals: parsed.signals || [],\n  itemCount: parsed.itemCount || parsed.signals?.length || 0,\n  dateRange: parsed.dateRange || `${context.dateLastMonday} to ${context.dateToday}`,\n  status: parsed.status || (parsed.signals?.length > 0 ? 'success' : 'empty')\n};\n\nconsole.log(`GD collector: ${output.signals.length} signals extracted`);\nconsole.log(`High confidence: ${output.signals.filter(s => s.confidence === 'high').length}`);\n\nreturn [{ json: output }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "4128c5cd-5820-43d6-8759-fd83a0a26284",
+      "name": "GD: Parse Collector Output"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e4c002dc-0bd3-4cfa-877d-98f435b20765",
+              "name": "source",
+              "value": "={{ $json.source }}",
+              "type": "string"
+            },
+            {
+              "id": "299722da-81bb-4189-b1bd-bb26ecdcd512",
+              "name": "signals",
+              "value": "={{ JSON.stringify($json.signals) }}",
+              "type": "array"
+            },
+            {
+              "id": "5d3fc9bc-8d59-41c1-a305-aebb82f340bf",
+              "name": "itemCount",
+              "value": "={{ $json.itemCount }}",
+              "type": "number"
+            },
+            {
+              "id": "3413f262-5c16-4416-bb24-b92c922d86d9",
+              "name": "dateRange",
+              "value": "={{ $json.dateRange }}",
+              "type": "string"
+            },
+            {
+              "id": "7374dafa-4857-4f41-abc9-2ec70225e859",
+              "name": "status",
+              "value": "={{ $json.status }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        896,
+        0
+      ],
+      "id": "bbeae143-2aed-430d-99d7-8b3165fc996b",
+      "name": "Output: Return GD Signals"
+    },
+    {
+      "parameters": {
+        "content": "## Google Drive Ingestion\n",
+        "height": 416,
+        "width": 1616,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1216,
+        176
+      ],
+      "id": "02b40d47-648e-4c24-a99e-e39ad85dd3a2",
+      "name": "Sticky Note1"
+    }
+  ],
+  "pinData": {
+    "GD: Fetch Collector Prompt": [
+      {
+        "json": {
+          "object": "list",
+          "results": [
+            {
+              "object": "block",
+              "id": "8dbd2e0e-bf89-47b0-8892-31bd25287113",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "This page is the single source of truth for all prompts used across the Content Engine pipeline. ",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "This page is the single source of truth for all prompts used across the Content Engine pipeline. ",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "94d9c66c-cfaa-4998-a425-573024be7319",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "How to use this:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "How to use this:",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "bd03267b-0fc6-4181-8ff2-00389f23604c",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-25T05:45:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "bulleted_list_item",
+              "bulleted_list_item": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Edit prompts here - not inside Claude, n8n, or any automation tool",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Edit prompts here - not inside Claude, n8n, or any automation tool",
+                    "href": null
+                  }
+                ],
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "e9695507-c735-472f-b434-d600019de4f8",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "bulleted_list_item",
+              "bulleted_list_item": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Every prompt is versioned. When you change a prompt, note the date and what changed in the changelog at the bottom of each section",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Every prompt is versioned. When you change a prompt, note the date and what changed in the changelog at the bottom of each section",
+                    "href": null
+                  }
+                ],
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "db78549a-4de2-4221-a11a-564721fa31f2",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "bulleted_list_item",
+              "bulleted_list_item": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "When the engine moves to n8n, each node fetches its prompt from this page at runtime",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "When the engine moves to n8n, each node fetches its prompt from this page at runtime",
+                    "href": null
+                  }
+                ],
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "c04d8b25-5f94-4fe0-9da2-61ec6b228a0c",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "divider",
+              "divider": {},
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "75b0c02d-4959-4cfe-891e-d7e5f7e88980",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "heading_2",
+              "heading_2": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Layer 1 — Signal Digest Agent",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Layer 1 — Signal Digest Agent",
+                    "href": null
+                  }
+                ],
+                "is_toggleable": false,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "f1baa374-344b-4af8-bc53-a641d062277f",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Trigger:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Trigger:",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": " Every Monday manually (Phase 1) / Scheduled 9am Monday (Phase 2)",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": " Every Monday manually (Phase 1) / Scheduled 9am Monday (Phase 2)",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "ba8727a6-4693-4ef8-a190-429ffca8d86b",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "MCPs required:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "MCPs required:",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": " Slack, Notion",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": " Slack, Notion",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "f85ce44b-df4d-45ce-a8e8-36f3957fff6e",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Output:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Output:",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": " New page in 📥 Signal Digests database",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": " New page in 📥 Signal Digests database",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "64884424-7c63-4f7f-9c45-0716c0114fb6",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Last updated:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Last updated:",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": " 20 May 2026",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": " 20 May 2026",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "8e397f49-9e8f-4d06-875d-203f34ae15fe",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "divider",
+              "divider": {},
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "fd735ea7-0089-4288-83c4-05ba4a82f66b",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-22T10:57:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "code",
+              "code": {
+                "caption": [],
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "You are generating the weekly Signal Digest for Skai Lama's Content Engine.\nToday is [DATE]. This digest covers [LAST MONDAY] to [TODAY].\n\nSkai Lama builds Shopify apps: Easy Bundles (bundling), Kite (discounts/free gifts), \nFly Bundles (premium bundles), Checkout Wiz (checkout customisation), GiftKart (gift cards).\nGoal: $659K MRR by Dec 2026. ICP: Shopify merchants $100K-$5M GMV.\n\nBelow you will find pre-processed signals from three sources:\n- SLACK SIGNALS: extracted from 7 internal Slack channels\n- NOTION SIGNALS: extracted from recently updated Notion pages\n- MEETING NOTES: extracted from recent Google Meet transcripts\n\nYour job: synthesise these signals into a structured Signal Digest.\n\nOUTPUT FORMAT — use exactly this structure:\n\n## 🚀 Shipped this week\n[Max 4 items. Format: Product — Feature — one sentence description. Source.]\n\n## 💬 Customer signals\n[Recurring themes from reviews and CX. Format: Theme — evidence. Source.]\n\n## 🔥 ICP pain points\n[Bugs, friction, complaints. Format: Pain point — frequency — product. Source.]\n\n## 💰 Commercial signals\n[Merchant wins, pricing discussions, usage stats, competitive moves. Source.]\n\n## 💡 Content opportunities (exactly 3)\n\n**Opportunity 1**\n- Idea: [specific working title]\n- Why now: [what signal triggered this]\n- Product: [which product]\n- ICP: [Shopify merchants / SaaS founders / App developers / Monetization PMs]\n- Funnel stage: [Awareness / Consideration / Decision / Retention]\n- Angle: [what makes this different from generic content on this topic]\n\n**Opportunity 2**\n[same format]\n\n**Opportunity 3**\n[same format]",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "You are generating the weekly Signal Digest for Skai Lama's Content Engine.\nToday is [DATE]. This digest covers [LAST MONDAY] to [TODAY].\n\nSkai Lama builds Shopify apps: Easy Bundles (bundling), Kite (discounts/free gifts), \nFly Bundles (premium bundles), Checkout Wiz (checkout customisation), GiftKart (gift cards).\nGoal: $659K MRR by Dec 2026. ICP: Shopify merchants $100K-$5M GMV.\n\nBelow you will find pre-processed signals from three sources:\n- SLACK SIGNALS: extracted from 7 internal Slack channels\n- NOTION SIGNALS: extracted from recently updated Notion pages\n- MEETING NOTES: extracted from recent Google Meet transcripts\n\nYour job: synthesise these signals into a structured Signal Digest.\n\nOUTPUT FORMAT — use exactly this structure:\n\n## 🚀 Shipped this week\n[Max 4 items. Format: Product — Feature — one sentence description. Source.]\n\n## 💬 Customer signals\n[Recurring themes from reviews and CX. Format: Theme — evidence. Source.]\n\n## 🔥 ICP pain points\n[Bugs, friction, complaints. Format: Pain point — frequency — product. Source.]\n\n## 💰 Commercial signals\n[Merchant wins, pricing discussions, usage stats, competitive moves. Source.]\n\n## 💡 Content opportunities (exactly 3)\n\n**Opportunity 1**\n- Idea: [specific working title]\n- Why now: [what signal triggered this]\n- Product: [which product]\n- ICP: [Shopify merchants / SaaS founders / App developers / Monetization PMs]\n- Funnel stage: [Awareness / Consideration / Decision / Retention]\n- Angle: [what makes this different from generic content on this topic]\n\n**Opportunity 2**\n[same format]\n\n**Opportunity 3**\n[same format]",
+                    "href": null
+                  }
+                ],
+                "language": "javascript"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "c8934f24-30ae-4431-9826-697ec32f53c7",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Changelog:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Changelog:",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "0476f127-8125-449c-b30a-0ec1f0ffda56",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "bulleted_list_item",
+              "bulleted_list_item": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "20 May 2026 — v1. First version. Shipped this week capped at 4 items.",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "20 May 2026 — v1. First version. Shipped this week capped at 4 items.",
+                    "href": null
+                  }
+                ],
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "33a8e888-2464-4273-9645-60e5e12d04e3",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "divider",
+              "divider": {},
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "f3cdbf9e-b3a2-4bb3-8840-8dab37a3a429",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-25T05:45:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "heading_2",
+              "heading_2": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Layer 2 - Calendar Agent",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Layer 2 - Calendar Agent",
+                    "href": null
+                  }
+                ],
+                "is_toggleable": false,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "91e10863-4093-4ee3-82ec-c1d3289a68c4",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Trigger:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Trigger:",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": " After Signal Digest is approved (manual trigger in Phase 1)",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": " After Signal Digest is approved (manual trigger in Phase 1)",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "0e1e3bb8-f98f-43af-b9f7-18d310823c34",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "MCPs required:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "MCPs required:",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": " Notion",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": " Notion",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "78c58b71-41ee-4303-b7fc-4b67e8949428",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Input:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Input:",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": " Latest Signal Digest page in Notion",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": " Latest Signal Digest page in Notion",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "56ef6140-c48d-4315-a0ff-faca3dad2389",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Output:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Output:",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": " New entries in 📆 Content Calendar database",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": " New entries in 📆 Content Calendar database",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "ee291275-4ed6-4583-a447-a9825eea84c0",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Last updated:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Last updated:",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": " 20 May 2026",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": " 20 May 2026",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "9cd4dabc-07bd-4fd3-b309-0a7c1193e8d6",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "divider",
+              "divider": {},
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "36c701ef-afc9-4fa2-822c-395d211bcde6",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "code",
+              "code": {
+                "caption": [],
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "You are the Calendar Agent for Skai Lama's Content Engine.\n\nSTEP 1 — FETCH LATEST SIGNAL DIGEST\nSearch Notion for the most recent page in the\n📥 Signal Digests database. Fetch its full content.\n\nSTEP 2 — EXTRACT OPPORTUNITIES\nFrom the digest, pull:\n- All content opportunities listed\n- Any commercial signals strong enough to warrant\n  a piece (competitive displacement, merchant wins,\n  churn data)\n- Any shipped features that need a content layer\n\nSTEP 3 — BUILD CALENDAR ENTRIES\nFor each item, create a page in 📆 Content Calendar\n(data source: d578fa43-960b-40f7-a971-94020484bb1d) with:\n- Title: working title\n- Status: Proposed\n- Format: Blog post / Case study / Comparison page /\n  Landing page / Technical guide\n- Product: relevant product(s)\n- ICP: Shopify merchants / SaaS founders /\n  App developers / Monetization PMs\n- Funnel Stage: Awareness / Consideration /\n  Decision / Retention\n- Business Goal: SEO ranking / Demo conversion /\n  Sales enablement / Expansion narrative\n- Target Keyword: best guess, 3-5 words\n- Signal Source: digest title + Slack channel\n- Publish Date: space entries 7 days apart\n  starting from next Monday\n- Opportunity Score: 1-10 based on signal strength,\n  commercial relevance, and timing\n\nPage body must contain:\n## Brief (2-3 sentences on what the piece covers)\n## Angle (what makes this different from\n  generic content on this topic)\n## Signal source (exact source)\n## Next step (one action for PMM before drafting)",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "You are the Calendar Agent for Skai Lama's Content Engine.\n\nSTEP 1 — FETCH LATEST SIGNAL DIGEST\nSearch Notion for the most recent page in the\n📥 Signal Digests database. Fetch its full content.\n\nSTEP 2 — EXTRACT OPPORTUNITIES\nFrom the digest, pull:\n- All content opportunities listed\n- Any commercial signals strong enough to warrant\n  a piece (competitive displacement, merchant wins,\n  churn data)\n- Any shipped features that need a content layer\n\nSTEP 3 — BUILD CALENDAR ENTRIES\nFor each item, create a page in 📆 Content Calendar\n(data source: d578fa43-960b-40f7-a971-94020484bb1d) with:\n- Title: working title\n- Status: Proposed\n- Format: Blog post / Case study / Comparison page /\n  Landing page / Technical guide\n- Product: relevant product(s)\n- ICP: Shopify merchants / SaaS founders /\n  App developers / Monetization PMs\n- Funnel Stage: Awareness / Consideration /\n  Decision / Retention\n- Business Goal: SEO ranking / Demo conversion /\n  Sales enablement / Expansion narrative\n- Target Keyword: best guess, 3-5 words\n- Signal Source: digest title + Slack channel\n- Publish Date: space entries 7 days apart\n  starting from next Monday\n- Opportunity Score: 1-10 based on signal strength,\n  commercial relevance, and timing\n\nPage body must contain:\n## Brief (2-3 sentences on what the piece covers)\n## Angle (what makes this different from\n  generic content on this topic)\n## Signal source (exact source)\n## Next step (one action for PMM before drafting)",
+                    "href": null
+                  }
+                ],
+                "language": "javascript"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "fd567feb-1a5b-4d90-9b31-e8b34b760cae",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Changelog:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Changelog:",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "642f5966-130d-4b0f-8ac9-3c7823b60c1d",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "bulleted_list_item",
+              "bulleted_list_item": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "20 May 2026 — v1. First version.",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "20 May 2026 — v1. First version.",
+                    "href": null
+                  }
+                ],
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "cd85febe-c31f-4800-86f2-1a5dc7e5d1e8",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "divider",
+              "divider": {},
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "9aefb1c9-6c9a-49f7-9b9d-fe0289d68b38",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-25T05:45:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "heading_2",
+              "heading_2": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Layer 3 - Research Agent",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Layer 3 - Research Agent",
+                    "href": null
+                  }
+                ],
+                "is_toggleable": false,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "03d82d90-2a47-4c35-9ef1-f843c4fe2859",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Trigger:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Trigger:",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": " After PMM approves a Calendar Item (Status → Approved)",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": " After PMM approves a Calendar Item (Status → Approved)",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "24e55dda-b64f-4003-89d4-55f31783f24f",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "MCPs required:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "MCPs required:",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": " Ahrefs, Notion, Web search",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": " Ahrefs, Notion, Web search",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "005a9dea-63b0-4682-abd5-078096063cd1",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Input:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Input:",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": " Approved Calendar Item",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": " Approved Calendar Item",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "16e21996-6b51-470a-a073-cdd751590518",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Output:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Output:",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": " New page in 📋 Research Briefs database, linked to Calendar Item",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": " New page in 📋 Research Briefs database, linked to Calendar Item",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "141a2aa0-1b08-4e95-a805-fc20279f41ce",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Last updated:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Last updated:",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": " 20 May 2026",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": " 20 May 2026",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "e5c787ff-6b53-4b5a-bef0-a8e00c116731",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "divider",
+              "divider": {},
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "aaeac1b5-7352-43a1-9170-384394b07ebd",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "code",
+              "code": {
+                "caption": [],
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "You are the Research Agent for Skai Lama's Content Engine.\n\nINPUT: A calendar item from 📆 Content Calendar\n       with Status = Approved.\n\nSTEP 1 — FETCH CALENDAR ITEM\nRead the calendar item. Extract:\n- Working title\n- Target keyword\n- Product\n- ICP\n- Format\n\nSTEP 2 — AHREFS KEYWORD RESEARCH\nRun keywords-explorer-overview for:\n- The target keyword\n- 4-6 related broader keywords\nSelect: keyword, volume, difficulty, cpc,\n        traffic_potential, intents, global_volume\nCountry: us\n\nSTEP 3 — SERP ANALYSIS\nRun serp-overview for the highest-opportunity keyword.\nSelect: title, url, domain_rating, traffic,\n        backlinks, refdomains, position, page_type\nTop positions: 8\n\nSTEP 4 — COMMUNITY RESEARCH\nWeb search for ICP pain points:\n- \"[product category] problems merchants Reddit\"\n- \"[product category] app not working reviews\"\nExtract: real complaints, recurring patterns,\n         verbatim frustrations\n\nSTEP 5 — GAP ANALYSIS\nBased on SERP + community research, identify:\n- What's missing from all ranking content\n- Where Skai Lama has unique data or POV\n- The specific angle no competitor can take\n\nSTEP 6 — CREATE RESEARCH BRIEF\nCreate a page in 📋 Research Briefs\n(data source: 41bf0e73-98e8-419f-a3eb-46ddba7d7216) with:\n- Brief Title: \"[Piece title]: Research Brief\"\n- Status: Ready for review\n- Target Keyword, Monthly Search Volume,\n  Keyword Difficulty, ICP, Product,\n  Signal Source, Recommended Angle, Content Gap\n\nPage body must contain:\n## Keyword data (table)\n## SERP analysis (table: position, title, DR,\n   traffic, angle)\n## ICP pain points (from community research)\n## Content gap (what's missing from SERP)\n## Recommended angle (specific, not generic)\n## Recommended structure (numbered sections)\n## Next steps for PMM (max 3 actions)\n\nFooter: *Research by Content Engine — Layer 3.\nSources: Ahrefs MCP, web search, Signal Digest [date].*\n\nSTEP 7 — LINK AND UPDATE\nUpdate the calendar item:\n- Research Brief: [link to new brief]\n- Status: In Research",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "You are the Research Agent for Skai Lama's Content Engine.\n\nINPUT: A calendar item from 📆 Content Calendar\n       with Status = Approved.\n\nSTEP 1 — FETCH CALENDAR ITEM\nRead the calendar item. Extract:\n- Working title\n- Target keyword\n- Product\n- ICP\n- Format\n\nSTEP 2 — AHREFS KEYWORD RESEARCH\nRun keywords-explorer-overview for:\n- The target keyword\n- 4-6 related broader keywords\nSelect: keyword, volume, difficulty, cpc,\n        traffic_potential, intents, global_volume\nCountry: us\n\nSTEP 3 — SERP ANALYSIS\nRun serp-overview for the highest-opportunity keyword.\nSelect: title, url, domain_rating, traffic,\n        backlinks, refdomains, position, page_type\nTop positions: 8\n\nSTEP 4 — COMMUNITY RESEARCH\nWeb search for ICP pain points:\n- \"[product category] problems merchants Reddit\"\n- \"[product category] app not working reviews\"\nExtract: real complaints, recurring patterns,\n         verbatim frustrations\n\nSTEP 5 — GAP ANALYSIS\nBased on SERP + community research, identify:\n- What's missing from all ranking content\n- Where Skai Lama has unique data or POV\n- The specific angle no competitor can take\n\nSTEP 6 — CREATE RESEARCH BRIEF\nCreate a page in 📋 Research Briefs\n(data source: 41bf0e73-98e8-419f-a3eb-46ddba7d7216) with:\n- Brief Title: \"[Piece title]: Research Brief\"\n- Status: Ready for review\n- Target Keyword, Monthly Search Volume,\n  Keyword Difficulty, ICP, Product,\n  Signal Source, Recommended Angle, Content Gap\n\nPage body must contain:\n## Keyword data (table)\n## SERP analysis (table: position, title, DR,\n   traffic, angle)\n## ICP pain points (from community research)\n## Content gap (what's missing from SERP)\n## Recommended angle (specific, not generic)\n## Recommended structure (numbered sections)\n## Next steps for PMM (max 3 actions)\n\nFooter: *Research by Content Engine — Layer 3.\nSources: Ahrefs MCP, web search, Signal Digest [date].*\n\nSTEP 7 — LINK AND UPDATE\nUpdate the calendar item:\n- Research Brief: [link to new brief]\n- Status: In Research",
+                    "href": null
+                  }
+                ],
+                "language": "javascript"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "1d437c54-0db9-4bea-aaac-efd16114737d",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Changelog:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Changelog:",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "77142fed-a773-4631-808e-944d272eb92d",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "bulleted_list_item",
+              "bulleted_list_item": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "20 May 2026 — v1. First version.",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "20 May 2026 — v1. First version.",
+                    "href": null
+                  }
+                ],
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "4c12c8bc-c953-41e6-ad85-c0a81a703489",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "divider",
+              "divider": {},
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "f12d53c9-495d-431f-b51a-f00000302db8",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-25T05:45:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "heading_2",
+              "heading_2": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Layer 4 - Generation Agent",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Layer 4 - Generation Agent",
+                    "href": null
+                  }
+                ],
+                "is_toggleable": false,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "b40bdf2d-beb6-47a7-bb6c-84c3329bf79b",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Trigger:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Trigger:",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": " After PMM approves Research Brief (Status → Approved)",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": " After PMM approves Research Brief (Status → Approved)",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "fd74a2b3-a17d-49a0-83a8-2cb86eec9753",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "MCPs required:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "MCPs required:",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": " Notion",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": " Notion",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "c83f4004-b633-4ea7-bf14-444bb35ff126",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Input:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Input:",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": " Approved Research Brief + Style Guide",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": " Approved Research Brief + Style Guide",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "85228deb-95b1-4f51-8d9f-b6baa806e198",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Output:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Output:",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": " New page in 📝 Drafts database, linked to Brief and Calendar Item",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": " New page in 📝 Drafts database, linked to Brief and Calendar Item",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "d6dafa2a-17d8-4e0c-aaa9-b9ec2021fefb",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Last updated:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Last updated:",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": " 20 May 2026",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": " 20 May 2026",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "c9908f36-0511-4f72-a348-28c7a5b7c6e6",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "divider",
+              "divider": {},
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "ebf4890b-0dd4-4838-be3c-5622290b0baa",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "code",
+              "code": {
+                "caption": [],
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "You are the Content Generation Agent for Skai Lama.\n\nSTEP 1 — FETCH INPUTS\nFetch the Research Brief linked to the Calendar Item.\nFetch the Style Guide:\n[link: https://www.notion.so/3667013d07a481b4be33fb3ba9677213]\n\nNote all:\n- Banned words and phrases\n- Voice principles\n- Product naming rules\n- Structural preferences (word count, subheading\n  frequency, CTA placement)\n- Channel voice profile for this format\n\nSTEP 2 — GENERATE DRAFT\nUsing the research brief and style guide, write a\ncomplete draft. Follow the recommended structure\nfrom the brief exactly.\n\nRules:\n- Never use banned words or phrases\n- Correct product naming throughout\n- Open with a data point or specific merchant outcome\n  — never a generic setup paragraph\n- Every claim grounded in the research brief\n  or Signal Digest — no invented stats\n- CTA at end: outcome-first, not product-first\n- Match word count target from style guide\n\nSTEP 3 — SELF-CRITIQUE PASS\nReview your own draft against the style guide.\nAdd a ## Self-critique section at the bottom:\n- What's working (2-3 points)\n- What needs PMM attention (data sign-offs,\n  named examples, voice calibration, links)\n- Any product naming errors found and corrected\n\nSTEP 4 — CREATE DRAFT IN NOTION\nCreate a page in 📝 Drafts\n(data source: 0f388881-a201-4422-8596-5aeff93c3dfa):\n- Title: [piece title]\n- Status: PMM Review\n- Format: [from calendar item]\n- Product: [from calendar item]\n- Word Count: [actual count]\n- Publish Date: [from calendar item]\n- PMM Notes: top 3 things needing human\n  attention before publish\n- Research Brief: [link]\n- Calendar Item: [link]\n\nPage body: full draft + self-critique section.\n\nSTEP 5 — UPDATE CALENDAR ITEM\nSet calendar item Status to: In Draft.",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "You are the Content Generation Agent for Skai Lama.\n\nSTEP 1 — FETCH INPUTS\nFetch the Research Brief linked to the Calendar Item.\nFetch the Style Guide:\n[link: https://www.notion.so/3667013d07a481b4be33fb3ba9677213]\n\nNote all:\n- Banned words and phrases\n- Voice principles\n- Product naming rules\n- Structural preferences (word count, subheading\n  frequency, CTA placement)\n- Channel voice profile for this format\n\nSTEP 2 — GENERATE DRAFT\nUsing the research brief and style guide, write a\ncomplete draft. Follow the recommended structure\nfrom the brief exactly.\n\nRules:\n- Never use banned words or phrases\n- Correct product naming throughout\n- Open with a data point or specific merchant outcome\n  — never a generic setup paragraph\n- Every claim grounded in the research brief\n  or Signal Digest — no invented stats\n- CTA at end: outcome-first, not product-first\n- Match word count target from style guide\n\nSTEP 3 — SELF-CRITIQUE PASS\nReview your own draft against the style guide.\nAdd a ## Self-critique section at the bottom:\n- What's working (2-3 points)\n- What needs PMM attention (data sign-offs,\n  named examples, voice calibration, links)\n- Any product naming errors found and corrected\n\nSTEP 4 — CREATE DRAFT IN NOTION\nCreate a page in 📝 Drafts\n(data source: 0f388881-a201-4422-8596-5aeff93c3dfa):\n- Title: [piece title]\n- Status: PMM Review\n- Format: [from calendar item]\n- Product: [from calendar item]\n- Word Count: [actual count]\n- Publish Date: [from calendar item]\n- PMM Notes: top 3 things needing human\n  attention before publish\n- Research Brief: [link]\n- Calendar Item: [link]\n\nPage body: full draft + self-critique section.\n\nSTEP 5 — UPDATE CALENDAR ITEM\nSet calendar item Status to: In Draft.",
+                    "href": null
+                  }
+                ],
+                "language": "javascript"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "dafabf84-751a-4c31-a7ea-8497339cc694",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Changelog:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Changelog:",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "5d57f087-3628-499f-809a-30dffc6193ea",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": true,
+              "in_trash": false,
+              "type": "bulleted_list_item",
+              "bulleted_list_item": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "20 May 2026 — v1. Placeholder style guide in use.",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "20 May 2026 — v1. Placeholder style guide in use.",
+                    "href": null
+                  }
+                ],
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "848aac01-59cc-4e11-9385-1c4e93e087dc",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "divider",
+              "divider": {},
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "abe76716-b1d7-4897-b94b-081ba0fd0c47",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "heading_2",
+              "heading_2": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Database reference",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Database reference",
+                    "href": null
+                  }
+                ],
+                "is_toggleable": false,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "f799dce4-799a-41b2-89da-0f5c22f83f45",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": true,
+              "in_trash": false,
+              "type": "table",
+              "table": {
+                "table_width": 3,
+                "has_column_header": true,
+                "has_row_header": false
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "fe6ddae8-ee62-4bec-996b-01b939a5d296",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "divider",
+              "divider": {},
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "039e0369-2524-492c-adfb-2a3d3a1dc32d",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "heading_2",
+              "heading_2": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Prompt versioning rules",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Prompt versioning rules",
+                    "href": null
+                  }
+                ],
+                "is_toggleable": false,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "386804f1-1ff0-4ae5-abcf-ba0d41d4872d",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "numbered_list_item",
+              "numbered_list_item": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Never edit a prompt without adding a changelog entry",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Never edit a prompt without adding a changelog entry",
+                    "href": null
+                  }
+                ],
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "0ee467e1-e0d3-4870-8c52-a168d520914e",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "numbered_list_item",
+              "numbered_list_item": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Format: ",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Format: ",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "[date] — v[N]. [what changed and why]",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": true,
+                      "color": "default"
+                    },
+                    "plain_text": "[date] — v[N]. [what changed and why]",
+                    "href": null
+                  }
+                ],
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "367e1d2a-edc3-4e7f-ac02-376c447806b7",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": true,
+              "in_trash": false,
+              "type": "numbered_list_item",
+              "numbered_list_item": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "If a change breaks downstream output, roll back",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "If a change breaks downstream output, roll back",
+                    "href": null
+                  }
+                ],
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "c4eec36e-5dfd-4809-becf-092f7847dffb",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "numbered_list_item",
+              "numbered_list_item": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Major changes (new steps, removed steps) = new version number",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Major changes (new steps, removed steps) = new version number",
+                    "href": null
+                  }
+                ],
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "21175f17-5ed1-4769-9f1c-67c38680df3d",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "numbered_list_item",
+              "numbered_list_item": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Minor changes (wording, thresholds) = same version, note the change",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Minor changes (wording, thresholds) = same version, note the change",
+                    "href": null
+                  }
+                ],
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "787d0fde-1496-49af-aa79-b81b64bc2015",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:42:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "divider",
+              "divider": {},
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "489ce659-037b-482f-9360-b7e777e9f6d6",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-20T10:42:00.000Z",
+              "last_edited_time": "2026-05-20T10:44:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Created 20 May 2026. Part of the Skai Lama Content Engine.",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": true,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Created 20 May 2026. Part of the Skai Lama Content Engine.",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "dee1fea4-e4e5-4ca3-899f-5893016ae7f8",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-27T06:30:00.000Z",
+              "last_edited_time": "2026-05-27T06:30:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "heading_2",
+              "heading_2": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Collector Base Prompt",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Collector Base Prompt",
+                    "href": null
+                  }
+                ],
+                "is_toggleable": false,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "3a74684c-b338-4308-bfb7-9f1f0c029203",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-27T06:30:00.000Z",
+              "last_edited_time": "2026-05-27T06:30:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Trigger:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Trigger:",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": " Every source collector subflow (Slack, Notion, GD, GitHub, Mantle, Canny, Mixpanel)",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": " Every source collector subflow (Slack, Notion, GD, GitHub, Mantle, Canny, Mixpanel)",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "f43ffd18-1488-4710-a204-c995e6d59f3b",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-27T06:30:00.000Z",
+              "last_edited_time": "2026-05-27T06:30:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Input:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Input:",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": " Raw data from source",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": " Raw data from source",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "1ac649ff-318c-4cc4-944a-616b47aa1b88",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-27T06:30:00.000Z",
+              "last_edited_time": "2026-05-27T06:30:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Output:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Output:",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": " Structured signal objects with full provenance",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": " Structured signal objects with full provenance",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "a6fcc784-d56f-473a-a90b-693dff2f5232",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-27T06:30:00.000Z",
+              "last_edited_time": "2026-05-27T06:30:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Last updated:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Last updated:",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": " 25 May 2026",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": " 25 May 2026",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "2ad097b0-6dee-4f40-b2f7-0c6cb488256b",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-27T06:30:00.000Z",
+              "last_edited_time": "2026-05-27T06:30:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "divider",
+              "divider": {},
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "0b10473d-1075-4d05-9910-e8b4b620807a",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-27T06:30:00.000Z",
+              "last_edited_time": "2026-05-27T06:46:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "code",
+              "code": {
+                "caption": [],
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "You are a signal extraction specialist for Skai Lama.\n\nCOMPANY CONTEXT:\nSkai Lama builds Shopify apps:\n- Easy Bundles: bundling app, free pricing, 57% HVCs at $0 revenue, building AI bundle creation\n- Kite: discount/free gift app, Rust migration done, 10-min churn problem\n- Fly Bundles: premium bundles, FBT launched, design flexibility\n- Checkout Wiz: checkout customisation\n- GiftKart: gift cards V2\nGoal: $659K MRR by Dec 2026\nICP: Shopify merchants $100K-$5M GMV\nKey people: Sid (CEO), Surya Varma (Kite), Ishaan (AI+Partnerships), Rohan (Engineering/Design)\n\nSIGNAL TYPES:\n- shipped_feature: something new shipped, launched, or announced\n- customer_signal: merchant win, positive outcome, revenue stat\n- pain_point: complaint, friction, bug pattern, support theme\n- commercial: pricing discussion, deal, churn risk, expansion\n- competitive: competitor move, merchant switching, market signal\n\nEXTRACTION RULES — NON-NEGOTIABLE:\n1. Every signal must have a direct quote or data point from the source\n2. Every signal must have a source URL or reference\n3. Every signal must be tagged to a product\n4. Never invent, infer, or extrapolate — only extract what is explicitly present in the raw data\n5. If you cannot attribute a signal to a specific source, do not include it\n6. Ignore: standup pings, join/leave notifications, admin logistics, HR updates, bug fixes under 5 lines\n7. Confidence scoring:\n   - HIGH: quantified data point (number, revenue, merchant name) OR appears in multiple sources\n   - MEDIUM: qualitative but specific (named person, specific feature, clear outcome)\n   - LOW: vague, general, or unattributed\n\nOUTPUT FORMAT — return only valid JSON, no backticks:\n{\n  \"source\": \"[source_name]\",\n  \"signals\": [\n    {\n      \"id\": \"[source]-[timestamp_or_index]\",\n      \"type\": \"shipped_feature|customer_signal|pain_point|commercial|competitive\",\n      \"content\": \"exact signal in one sentence\",\n      \"evidence\": \"direct quote or data point from source\",\n      \"confidence\": \"high|medium|low\",\n      \"product\": \"Easy Bundles|Kite|Fly Bundles|Checkout Wiz|GiftKart|All\",\n      \"origin\": {\n        \"name\": \"source name (channel, page title, doc name)\",\n        \"author\": \"person name if available\",\n        \"date\": \"YYYY-MM-DD\",\n        \"url\": \"direct link if available\"\n      }\n    }\n  ],\n  \"itemCount\": 0,\n  \"dateRange\": \"YYYY-MM-DD to YYYY-MM-DD\",\n  \"status\": \"success|empty|error\"\n}\n\nSOURCE DATA:\n[raw source data injected here]",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "You are a signal extraction specialist for Skai Lama.\n\nCOMPANY CONTEXT:\nSkai Lama builds Shopify apps:\n- Easy Bundles: bundling app, free pricing, 57% HVCs at $0 revenue, building AI bundle creation\n- Kite: discount/free gift app, Rust migration done, 10-min churn problem\n- Fly Bundles: premium bundles, FBT launched, design flexibility\n- Checkout Wiz: checkout customisation\n- GiftKart: gift cards V2\nGoal: $659K MRR by Dec 2026\nICP: Shopify merchants $100K-$5M GMV\nKey people: Sid (CEO), Surya Varma (Kite), Ishaan (AI+Partnerships), Rohan (Engineering/Design)\n\nSIGNAL TYPES:\n- shipped_feature: something new shipped, launched, or announced\n- customer_signal: merchant win, positive outcome, revenue stat\n- pain_point: complaint, friction, bug pattern, support theme\n- commercial: pricing discussion, deal, churn risk, expansion\n- competitive: competitor move, merchant switching, market signal\n\nEXTRACTION RULES — NON-NEGOTIABLE:\n1. Every signal must have a direct quote or data point from the source\n2. Every signal must have a source URL or reference\n3. Every signal must be tagged to a product\n4. Never invent, infer, or extrapolate — only extract what is explicitly present in the raw data\n5. If you cannot attribute a signal to a specific source, do not include it\n6. Ignore: standup pings, join/leave notifications, admin logistics, HR updates, bug fixes under 5 lines\n7. Confidence scoring:\n   - HIGH: quantified data point (number, revenue, merchant name) OR appears in multiple sources\n   - MEDIUM: qualitative but specific (named person, specific feature, clear outcome)\n   - LOW: vague, general, or unattributed\n\nOUTPUT FORMAT — return only valid JSON, no backticks:\n{\n  \"source\": \"[source_name]\",\n  \"signals\": [\n    {\n      \"id\": \"[source]-[timestamp_or_index]\",\n      \"type\": \"shipped_feature|customer_signal|pain_point|commercial|competitive\",\n      \"content\": \"exact signal in one sentence\",\n      \"evidence\": \"direct quote or data point from source\",\n      \"confidence\": \"high|medium|low\",\n      \"product\": \"Easy Bundles|Kite|Fly Bundles|Checkout Wiz|GiftKart|All\",\n      \"origin\": {\n        \"name\": \"source name (channel, page title, doc name)\",\n        \"author\": \"person name if available\",\n        \"date\": \"YYYY-MM-DD\",\n        \"url\": \"direct link if available\"\n      }\n    }\n  ],\n  \"itemCount\": 0,\n  \"dateRange\": \"YYYY-MM-DD to YYYY-MM-DD\",\n  \"status\": \"success|empty|error\"\n}\n\nSOURCE DATA:\n[raw source data injected here]",
+                    "href": null
+                  }
+                ],
+                "language": "javascript"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "0b2e72f5-c48d-4c5a-87ba-3fd7f8462d64",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-27T06:30:00.000Z",
+              "last_edited_time": "2026-05-27T06:30:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Changelog:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Changelog:",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "6307d05e-bc1e-4d87-9801-f9005e7919e5",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-27T06:30:00.000Z",
+              "last_edited_time": "2026-05-27T06:30:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "bulleted_list_item",
+              "bulleted_list_item": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "25 May 2026 — v1. First version. Replaces individual distillers in each subflow. Full provenance required on every signal.",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "25 May 2026 — v1. First version. Replaces individual distillers in each subflow. Full provenance required on every signal.",
+                    "href": null
+                  }
+                ],
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "cf8f23e1-4b58-4111-8784-f8d508a3ce2b",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-27T06:30:00.000Z",
+              "last_edited_time": "2026-05-27T06:30:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "divider",
+              "divider": {},
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "dd70ff64-04e0-4fe9-9e67-c317deb1db87",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-27T06:30:00.000Z",
+              "last_edited_time": "2026-05-27T06:30:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "heading_2",
+              "heading_2": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Universal Distiller Prompt",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Universal Distiller Prompt",
+                    "href": null
+                  }
+                ],
+                "is_toggleable": false,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "853e5658-8a5b-4620-a876-8242d6e2cf0f",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-27T06:30:00.000Z",
+              "last_edited_time": "2026-05-27T06:30:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Trigger:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Trigger:",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": " Signal Intelligence Workflow — after all collector subflows return",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": " Signal Intelligence Workflow — after all collector subflows return",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "b3ac4eb4-8bbe-46ac-bd51-36eae69f9158",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-27T06:30:00.000Z",
+              "last_edited_time": "2026-05-27T06:30:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Input:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Input:",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": " All structured signal objects from all collectors",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": " All structured signal objects from all collectors",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "700a6b1f-7007-43e9-841d-275f4a30c26d",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-27T06:30:00.000Z",
+              "last_edited_time": "2026-05-27T06:30:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Output:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Output:",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": " Ranked signal digest with cross-source dedup and content opportunities",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": " Ranked signal digest with cross-source dedup and content opportunities",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "06368d18-76ce-42a6-86a3-34ac8d80fc29",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-27T06:30:00.000Z",
+              "last_edited_time": "2026-05-27T06:30:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Last updated:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Last updated:",
+                    "href": null
+                  },
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": " 25 May 2026",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": " 25 May 2026",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "67ef34e7-ecaa-4442-96ef-06361408027d",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-27T06:30:00.000Z",
+              "last_edited_time": "2026-05-27T06:30:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "divider",
+              "divider": {},
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "4c8af735-e435-4ee7-85ca-9664da748d76",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-27T06:30:00.000Z",
+              "last_edited_time": "2026-05-27T06:30:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "code",
+              "code": {
+                "caption": [],
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "You are the Signal Intelligence Engine for Skai Lama's content marketing system.\n\nYou have received structured signals from multiple sources.\nYour job is to:\n\n1. DEDUPLICATE — merge signals about the same topic from different sources\n   into one signal with all origins listed\n\n2. SCORE — assign a final confidence score:\n   - HIGH: appears in 3+ sources OR has quantified data\n   - MEDIUM: appears in 2 sources OR has specific named evidence\n   - LOW: single source, qualitative only\n\n3. RANK — order by content worthiness:\n   - Quantified merchant outcome > named merchant story > product feature > general theme\n   - Multiple sources > single source\n   - Recent (this week) > older\n\n4. PROPOSE — for every HIGH and MEDIUM confidence signal, propose one specific content idea with:\n   - Working title\n   - Format (blog/case study/comparison/landing page/social)\n   - Target ICP\n   - Unique angle (what no competitor can write)\n   - All source URLs as evidence\n\nRULES:\n- Never propose content without a HIGH or MEDIUM signal\n- Never invent angles not supported by the evidence\n- Always preserve source URLs in the output\n- Cross-source patterns are the highest priority signals\n- LOW confidence signals: surface only, do not propose content\n\nOUTPUT FORMAT — valid JSON only, no backticks:\n{\n  \"digest\": {\n    \"week\": \"YYYY-MM-DD to YYYY-MM-DD\",\n    \"totalSignals\": 0,\n    \"highConfidence\": 0,\n    \"mediumConfidence\": 0,\n    \"lowConfidence\": 0,\n    \"sourcesRead\": []\n  },\n  \"signals\": [\n    {\n      \"id\": \"signal-001\",\n      \"type\": \"shipped_feature\",\n      \"content\": \"signal summary in one sentence\",\n      \"confidence\": \"high\",\n      \"product\": \"Easy Bundles\",\n      \"sources\": [\n        {\n          \"source\": \"slack\",\n          \"evidence\": \"direct quote from source\",\n          \"url\": \"https://...\",\n          \"author\": \"person name\",\n          \"date\": \"2026-05-20\"\n        }\n      ],\n      \"contentOpportunity\": {\n        \"title\": \"working title\",\n        \"format\": \"Blog post\",\n        \"icp\": \"Shopify merchants\",\n        \"funnelStage\": \"Consideration\",\n        \"angle\": \"specific unique angle no competitor can take\",\n        \"whyNow\": \"what makes this timely\"\n      }\n    }\n  ]\n}\n\nSIGNALS TO PROCESS:\n[all collector outputs injected here]",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "You are the Signal Intelligence Engine for Skai Lama's content marketing system.\n\nYou have received structured signals from multiple sources.\nYour job is to:\n\n1. DEDUPLICATE — merge signals about the same topic from different sources\n   into one signal with all origins listed\n\n2. SCORE — assign a final confidence score:\n   - HIGH: appears in 3+ sources OR has quantified data\n   - MEDIUM: appears in 2 sources OR has specific named evidence\n   - LOW: single source, qualitative only\n\n3. RANK — order by content worthiness:\n   - Quantified merchant outcome > named merchant story > product feature > general theme\n   - Multiple sources > single source\n   - Recent (this week) > older\n\n4. PROPOSE — for every HIGH and MEDIUM confidence signal, propose one specific content idea with:\n   - Working title\n   - Format (blog/case study/comparison/landing page/social)\n   - Target ICP\n   - Unique angle (what no competitor can write)\n   - All source URLs as evidence\n\nRULES:\n- Never propose content without a HIGH or MEDIUM signal\n- Never invent angles not supported by the evidence\n- Always preserve source URLs in the output\n- Cross-source patterns are the highest priority signals\n- LOW confidence signals: surface only, do not propose content\n\nOUTPUT FORMAT — valid JSON only, no backticks:\n{\n  \"digest\": {\n    \"week\": \"YYYY-MM-DD to YYYY-MM-DD\",\n    \"totalSignals\": 0,\n    \"highConfidence\": 0,\n    \"mediumConfidence\": 0,\n    \"lowConfidence\": 0,\n    \"sourcesRead\": []\n  },\n  \"signals\": [\n    {\n      \"id\": \"signal-001\",\n      \"type\": \"shipped_feature\",\n      \"content\": \"signal summary in one sentence\",\n      \"confidence\": \"high\",\n      \"product\": \"Easy Bundles\",\n      \"sources\": [\n        {\n          \"source\": \"slack\",\n          \"evidence\": \"direct quote from source\",\n          \"url\": \"https://...\",\n          \"author\": \"person name\",\n          \"date\": \"2026-05-20\"\n        }\n      ],\n      \"contentOpportunity\": {\n        \"title\": \"working title\",\n        \"format\": \"Blog post\",\n        \"icp\": \"Shopify merchants\",\n        \"funnelStage\": \"Consideration\",\n        \"angle\": \"specific unique angle no competitor can take\",\n        \"whyNow\": \"what makes this timely\"\n      }\n    }\n  ]\n}\n\nSIGNALS TO PROCESS:\n[all collector outputs injected here]",
+                    "href": null
+                  }
+                ],
+                "language": "javascript"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "1a43440c-e9be-470f-9e4c-3b9fe1eca70e",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-27T06:30:00.000Z",
+              "last_edited_time": "2026-05-27T06:30:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "paragraph",
+              "paragraph": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "Changelog:",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": true,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "Changelog:",
+                    "href": null
+                  }
+                ],
+                "icon": null,
+                "color": "default"
+              },
+              "archived": false
+            },
+            {
+              "object": "block",
+              "id": "ce98a2c9-907f-48b1-93e1-92756202417d",
+              "parent": {
+                "type": "page_id",
+                "page_id": "3667013d-07a4-8168-b948-d0fee1677a4e"
+              },
+              "created_time": "2026-05-27T06:30:00.000Z",
+              "last_edited_time": "2026-05-27T06:30:00.000Z",
+              "created_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "last_edited_by": {
+                "object": "user",
+                "id": "365d872b-594c-812d-b0e0-00020f9952e1"
+              },
+              "has_children": false,
+              "in_trash": false,
+              "type": "bulleted_list_item",
+              "bulleted_list_item": {
+                "rich_text": [
+                  {
+                    "type": "text",
+                    "text": {
+                      "content": "25 May 2026 — v1. First version. Cross-source dedup, confidence scoring, ranked content opportunities. LOW signals surface only — no content proposed.",
+                      "link": null
+                    },
+                    "annotations": {
+                      "bold": false,
+                      "italic": false,
+                      "strikethrough": false,
+                      "underline": false,
+                      "code": false,
+                      "color": "default"
+                    },
+                    "plain_text": "25 May 2026 — v1. First version. Cross-source dedup, confidence scoring, ranked content opportunities. LOW signals surface only — no content proposed.",
+                    "href": null
+                  }
+                ],
+                "color": "default"
+              },
+              "archived": false
+            }
+          ],
+          "next_cursor": null,
+          "has_more": false,
+          "type": "block",
+          "block": {},
+          "request_id": "177f6a34-3c5a-485f-85da-195503ce3356"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "GD: Filter 7 Days": {
+      "main": [
+        [
+          {
+            "node": "GD: Parse Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GD: Loop Over Files": {
+      "main": [
+        [
+          {
+            "node": "GD: Collate Meeting Notes",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GD: Has File ID?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GD: Has File ID?": {
+      "main": [
+        [
+          {
+            "node": "GD: HTTP GET Doc Content",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GD: No Files Placeholder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GD: HTTP GET Doc Content": {
+      "main": [
+        [
+          {
+            "node": "GD: Parse Doc Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GD: Parse Doc Content": {
+      "main": [
+        [
+          {
+            "node": "GD: Loop Over Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GD: Collate Meeting Notes": {
+      "main": [
+        [
+          {
+            "node": "GD: Fetch Collector Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Input: Receive Trigger": {
+      "main": [
+        [
+          {
+            "node": "GD: Search Meeting Notes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GD: Search Meeting Notes": {
+      "main": [
+        [
+          {
+            "node": "GD: Filter 7 Days",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GD: Parse Files": {
+      "main": [
+        [
+          {
+            "node": "GD: Loop Over Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GD: No Files Placeholder": {
+      "main": [
+        [
+          {
+            "node": "GD: Loop Over Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GD: Fetch Collector Prompt": {
+      "main": [
+        [
+          {
+            "node": "GD: Build Collector Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GD: Build Collector Context": {
+      "main": [
+        [
+          {
+            "node": "GD: Claude Collector",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GD: Claude Collector": {
+      "main": [
+        [
+          {
+            "node": "GD: Parse Collector Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GD: Parse Collector Output": {
+      "main": [
+        [
+          {
+            "node": "Output: Return GD Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "6553c99f-ead9-415e-9850-893a12d0c754",
+  "meta": {
+    "instanceId": "589cc82bfaef6a48e49f76563ee242289190c24e109e0fc3320975755d230378"
+  },
+  "id": "g15OWBJwVg0dErOR",
+  "tags": [
+    {
+      "updatedAt": "2026-05-26T10:35:31.003Z",
+      "createdAt": "2026-05-26T10:35:31.003Z",
+      "id": "7bSnGcS0YrA7kPDq",
+      "name": "meeting notes"
+    }
+  ]
+}

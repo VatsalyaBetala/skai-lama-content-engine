@@ -1,0 +1,1178 @@
+{
+  "name": "Signal Intelligence",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "dateToday"
+            },
+            {
+              "name": "dateLastMonday"
+            },
+            {
+              "name": "ts7DaysAgo",
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -480,
+        288
+      ],
+      "id": "30b8f9b3-2ae9-43ea-92c3-5e1f09d3d5b9",
+      "name": "Input: Receive Trigger"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "si-date-today",
+              "name": "dateToday",
+              "value": "={{ $('Input: Receive Trigger').first().json.dateToday }}",
+              "type": "string"
+            },
+            {
+              "id": "si-date-last-monday",
+              "name": "dateLastMonday",
+              "value": "={{ $('Input: Receive Trigger').first().json.dateLastMonday }}",
+              "type": "string"
+            },
+            {
+              "id": "si-ts-7days",
+              "name": "ts7DaysAgo",
+              "value": "={{ $('Input: Receive Trigger').first().json.ts7DaysAgo }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -256,
+        288
+      ],
+      "id": "6f48e4d3-5782-41df-bce9-daf4a04eb5fd",
+      "name": "Config: Signal Intelligence"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "SWu3mODs8Px4DMcc",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/SWu3mODs8Px4DMcc"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ts7DaysAgo": "={{ $('Config: Signal Intelligence').first().json.ts7DaysAgo }}",
+            "dateToday": "={{ $('Config: Signal Intelligence').first().json.dateToday }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "ts7DaysAgo",
+              "displayName": "ts7DaysAgo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            },
+            {
+              "id": "dateToday",
+              "displayName": "dateToday",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -32,
+        0
+      ],
+      "id": "ef6100a4-3dfb-4011-97ec-2cb599e8931b",
+      "name": "Run: Slack Signals"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "UJ2916e0LUo2xb6m",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/UJ2916e0LUo2xb6m"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "dateToday",
+              "displayName": "dateToday",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "dateLastMonday",
+              "displayName": "dateLastMonday",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -32,
+        192
+      ],
+      "id": "80b39a0c-e28c-46ac-9739-78e6c58b0be1",
+      "name": "Run: Notion Signals"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "g15OWBJwVg0dErOR",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/g15OWBJwVg0dErOR"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ts7DaysAgo": 0,
+            "dateToday": 0
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "ts7DaysAgo",
+              "displayName": "ts7DaysAgo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            },
+            {
+              "id": "dateToday",
+              "displayName": "dateToday",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            },
+            {
+              "id": "dateLastMonday",
+              "displayName": "dateLastMonday",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -32,
+        384
+      ],
+      "id": "8ba5e48a-8e75-406a-b096-c68e05eba808",
+      "name": "Run: GD Meeting Notes"
+    },
+    {
+      "parameters": {
+        "numberInputs": 4
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        224,
+        256
+      ],
+      "id": "e579431b-cd10-4087-96be-bbeea947f287",
+      "name": "Merge: All Sources"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst config = $('Config: Signal Intelligence').first().json;\n\nlet allSignals = [];\nconst sourcesRead = [];\n\nfor (const item of items) {\n  const source = item.json.source || 'unknown';\n  const status = item.json.status || 'empty';\n\n  if (status === 'error') {\n    console.log(`Source ${source} returned error — skipping`);\n    continue;\n  }\n\n  sourcesRead.push(source);\n\n  let signals = item.json.signals || [];\n  if (typeof signals === 'string') {\n    try {\n      signals = JSON.parse(signals);\n    } catch(e) {\n      console.log(`Failed to parse signals from ${source}: ${e.message}`);\n      signals = [];\n    }\n  }\n\n  for (const signal of signals) {\n    allSignals.push({\n      ...signal,\n      _source: source,\n      _dateRange: item.json.dateRange || ''\n    });\n  }\n}\n\nlet formattedSignals = `Total signals: ${allSignals.length}\\n`;\nformattedSignals += `Sources: ${sourcesRead.join(', ')}\\n`;\nformattedSignals += `Date range: ${config.dateLastMonday} to ${config.dateToday}\\n\\n`;\nformattedSignals += JSON.stringify(allSignals, null, 2);\n\nreturn [{\n  json: {\n    allSignals,\n    formattedSignals,\n    totalSignals: allSignals.length,\n    sourcesRead,\n    dateToday: config.dateToday,\n    dateLastMonday: config.dateLastMonday\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        288
+      ],
+      "id": "c746aff7-f5bc-4c5d-bd7b-5399fe8e549c",
+      "name": "Collate: All Signals",
+      "executeOnce": false,
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "url": "https://api.notion.com/v1/blocks/3667013d07a48168b948d0fee1677a4e/children?page_size=100",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        640,
+        288
+      ],
+      "id": "b377dc22-c7fc-40b4-9efb-e3b41bfb44ae",
+      "name": "Fetch: Universal Distiller Prompt",
+      "credentials": {
+        "notionApi": {
+          "id": "bJLSXb7rDb4zr6O5",
+          "name": "Notion - Vatsalya"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const blocks = $('Fetch: Universal Distiller Prompt').first().json.results || [];\nconst collated = $('Collate: All Signals').first().json;\n\nlet distillerPrompt = '';\nlet inDistillerSection = false;\n\nfor (const block of blocks) {\n  if (block.type === 'heading_2') {\n    const text = block.heading_2?.rich_text?.[0]?.plain_text || '';\n    if (text.includes('Universal Distiller Prompt')) {\n      inDistillerSection = true;\n      continue;\n    }\n    if (inDistillerSection) break;\n  }\n  if (inDistillerSection && block.type === 'code') {\n    distillerPrompt = block.code?.rich_text?.map(r => r.plain_text).join('') || '';\n    break;\n  }\n}\n\nif (!distillerPrompt) {\n  distillerPrompt = 'ERROR: Universal Distiller Prompt not found in Prompt Library';\n}\n\nconst finalPrompt = distillerPrompt\n  .replace('[all collector outputs injected here]', collated.formattedSignals || 'No signals found.')\n  .replace('multiple sources', `${collated.sourcesRead?.length || 0} sources (${collated.sourcesRead?.join(', ')})`);\n\nreturn [{\n  json: {\n    userMessage: finalPrompt,\n    totalSignals: collated.totalSignals,\n    sourcesRead: collated.sourcesRead,\n    dateToday: collated.dateToday,\n    dateLastMonday: collated.dateLastMonday\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        864,
+        288
+      ],
+      "id": "86868184-5e19-44b2-ac36-aba46b4df8b9",
+      "name": "Build: Distiller Context"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\"model\": \"claude-sonnet-4-20250514\", \"max_tokens\": 6000, \"messages\": [{\"role\": \"user\", \"content\": $('Build: Distiller Context').first().json.userMessage}]}) }}",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1088,
+        288
+      ],
+      "id": "ab2f1ca7-d91c-4a1d-b585-1fbc3cbb1504",
+      "name": "Universal Distiller",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "feoW1VBDikCNaQ3D",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst raw = response.content?.[0]?.text || '';\nconst context = $('Build: Distiller Context').first().json;\n\nconst clean = raw\n  .replace(/^```json\\n?/, '')\n  .replace(/\\n?```$/, '')\n  .trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(clean);\n} catch(e) {\n  parsed = {\n    digest: {\n      week: `${context.dateLastMonday} to ${context.dateToday}`,\n      totalSignals: 0,\n      highConfidence: 0,\n      mediumConfidence: 0,\n      lowConfidence: 0,\n      sourcesRead: context.sourcesRead || []\n    },\n    signals: [],\n    parse_error: e.message\n  };\n}\n\nconst digest = parsed.digest || {};\nconst signals = parsed.signals || [];\n\nlet formattedContext = `=== SIGNAL INTELLIGENCE DIGEST ===\\n`;\nformattedContext += `Week: ${digest.week || context.dateLastMonday + ' to ' + context.dateToday}\\n`;\nformattedContext += `Sources: ${(digest.sourcesRead || []).join(', ')}\\n`;\nformattedContext += `Total signals: ${digest.totalSignals || signals.length}\\n`;\nformattedContext += `High confidence: ${digest.highConfidence || signals.filter(s => s.confidence === 'high').length}\\n`;\nformattedContext += `Medium confidence: ${digest.mediumConfidence || signals.filter(s => s.confidence === 'medium').length}\\n\\n`;\n\nconst high = signals.filter(s => s.confidence === 'high');\nconst medium = signals.filter(s => s.confidence === 'medium');\nconst low = signals.filter(s => s.confidence === 'low');\n\nif (high.length > 0) {\n  formattedContext += `## 🔴 HIGH CONFIDENCE SIGNALS\\n\\n`;\n  for (const s of high) {\n    formattedContext += `### ${s.content}\\n`;\n    formattedContext += `Type: ${s.type} | Product: ${s.product}\\n`;\n    for (const src of (s.sources || [])) {\n      formattedContext += `Source: ${src.source} — \"${src.evidence}\"\\n`;\n      if (src.url) formattedContext += `URL: ${src.url}\\n`;\n    }\n    if (s.contentOpportunity) {\n      formattedContext += `\\n💡 Content idea: ${s.contentOpportunity.title}\\n`;\n      formattedContext += `Format: ${s.contentOpportunity.format} | ICP: ${s.contentOpportunity.icp}\\n`;\n      formattedContext += `Angle: ${s.contentOpportunity.angle}\\n`;\n      formattedContext += `Why now: ${s.contentOpportunity.whyNow}\\n`;\n    }\n    formattedContext += `\\n`;\n  }\n}\n\nif (medium.length > 0) {\n  formattedContext += `## 🟡 MEDIUM CONFIDENCE SIGNALS\\n\\n`;\n  for (const s of medium) {\n    formattedContext += `### ${s.content}\\n`;\n    formattedContext += `Type: ${s.type} | Product: ${s.product}\\n`;\n    for (const src of (s.sources || [])) {\n      formattedContext += `Source: ${src.source} — \"${src.evidence}\"\\n`;\n      if (src.url) formattedContext += `URL: ${src.url}\\n`;\n    }\n    if (s.contentOpportunity) {\n      formattedContext += `\\n💡 Content idea: ${s.contentOpportunity.title}\\n`;\n      formattedContext += `Format: ${s.contentOpportunity.format} | ICP: ${s.contentOpportunity.icp}\\n`;\n      formattedContext += `Angle: ${s.contentOpportunity.angle}\\n`;\n    }\n    formattedContext += `\\n`;\n  }\n}\n\nif (low.length > 0) {\n  formattedContext += `## ⚪ LOW CONFIDENCE SIGNALS (surface only)\\n\\n`;\n  for (const s of low) {\n    formattedContext += `- ${s.content} [${s.product}] — ${s.type}\\n`;\n  }\n}\n\nreturn [{\n  json: {\n    signalDigestContext: formattedContext,\n    rawSignals: parsed,\n    totalSignals: signals.length,\n    highConfidence: high.length,\n    mediumConfidence: medium.length,\n    lowConfidence: low.length,\n    sourcesRead: context.sourcesRead || []\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1312,
+        288
+      ],
+      "id": "acf836c6-3632-4e8a-8ea9-3e8ea211ddc1",
+      "name": "Parse: Distiller Output"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "si-out-context",
+              "name": "signalDigestContext",
+              "value": "={{ $json.signalDigestContext }}",
+              "type": "string"
+            },
+            {
+              "id": "si-out-total",
+              "name": "totalSignals",
+              "value": "={{ $json.totalSignals }}",
+              "type": "number"
+            },
+            {
+              "id": "si-out-high",
+              "name": "highConfidence",
+              "value": "={{ $json.highConfidence }}",
+              "type": "number"
+            },
+            {
+              "id": "si-out-sources",
+              "name": "sourcesRead",
+              "value": "={{ JSON.stringify($json.sourcesRead) }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1536,
+        288
+      ],
+      "id": "87808d1c-2f1f-4165-9325-2c7b1fb5d054",
+      "name": "Output: Signal Digest Context"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "WG07q6U68n9CppvG",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/WG07q6U68n9CppvG",
+          "cachedResultName": "Vatsalya's Project — Subflow: Crisp"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -32,
+        576
+      ],
+      "id": "d6aff2c6-cf92-46a0-9f26-073d53813d0e",
+      "name": "Run: Crisp"
+    }
+  ],
+  "pinData": {
+    "Run: Slack Signals": [
+      {
+        "json": {
+          "source": "slack",
+          "signals": [
+            {
+              "id": "slack-2026-05-25-01",
+              "type": "commercial",
+              "content": "Kite Plus scripts will be sunset on June 30th prompting campaign for uninstalled merchants",
+              "evidence": "let's do a campaign for all uninstalled kite plus merchants - solely focusing on the scripts being sunset on June 30th",
+              "confidence": "high",
+              "product": "Kite",
+              "origin": {
+                "name": "#kite channel",
+                "author": "not specified",
+                "date": "2026-05-25",
+                "url": "https://giftkart.slack.com/archives/C06GE7L456V"
+              }
+            },
+            {
+              "id": "slack-2026-05-25-02",
+              "type": "pain_point",
+              "content": "Easy Bundles team establishing standardized churn process to categorize churn reasons",
+              "evidence": "Define Churn Process: Establish a standardized methodology to categorize churn reasons by investigating cu",
+              "confidence": "medium",
+              "product": "Easy Bundles",
+              "origin": {
+                "name": "#easy-bundles channel",
+                "author": "not specified",
+                "date": "2026-05-25",
+                "url": "https://giftkart.slack.com/archives/C06KKHXMVFB"
+              }
+            }
+          ],
+          "itemCount": 2,
+          "dateRange": "2026-05-21 to 2026-05-28",
+          "status": "success"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Run: Notion Signals": [
+      {
+        "json": {
+          "source": "notion",
+          "signals": [
+            {
+              "id": "notion-001",
+              "type": "shipped_feature",
+              "content": "Easy Bundles shipping Bundle Builder analytics revamp with store-level comparison data and comparison-grounded bundle performance metrics",
+              "evidence": "EasyBundles — Analytics Revamp PRD with goals to 'Give merchants a clear, comparison-grounded view of bundle performance' and 'Build the data foundation the diagnostic and action layers will need later'",
+              "confidence": "high",
+              "product": "Easy Bundles",
+              "origin": {
+                "name": "PRD: Analytics [Easy Bundles - Bundle Builder]",
+                "author": null,
+                "date": "2026-05-26",
+                "url": "https://www.notion.so/PRD-Analytics-3687013d07a4807fac35cb5989ea8e51"
+              }
+            },
+            {
+              "id": "notion-002",
+              "type": "shipped_feature",
+              "content": "Kite developing Analytics MCP connector to give Claude access to analytics data for conversational diagnosis and planning",
+              "evidence": "An MCP connector that gives Claude (and potentially ChatGPT) access to Kite's analytics data - Claude becomes the interpretation and reasoning layer on top of Kite's existing analytics infrastructure",
+              "confidence": "high",
+              "product": "Kite",
+              "origin": {
+                "name": "PRD: Analytics MCP [Kite - Free Gift & Discounts]",
+                "author": "Surya",
+                "date": "2026-05-26",
+                "url": "https://www.notion.so/PRD-Analytics-MCP-36c7013d07a480c2af70c340f53306b5"
+              }
+            },
+            {
+              "id": "notion-003",
+              "type": "shipped_feature",
+              "content": "Kite launched Free Gift V2 with 934 creates, replacing the three-template V1 structure with unified form",
+              "evidence": "Free Gift V2 (Current) - Volume: 934 creates (recently launched, replacing V1) - Schema: Custom Discounts ✅ - Function: Shared with Free Gift on Checkout",
+              "confidence": "high",
+              "product": "Kite",
+              "origin": {
+                "name": "PRD: Reorganizing Offer types [Kite - Free Gift & Discounts]",
+                "author": null,
+                "date": "2026-05-26",
+                "url": "https://www.notion.so/PRD-Reorganizing-Offer-types-36c7013d07a48008ad22f673addd6d92"
+              }
+            },
+            {
+              "id": "notion-004",
+              "type": "customer_signal",
+              "content": "Free Gift V1 has 4,654 creates showing strong market demand for bundling functionality",
+              "evidence": "Free Gift V1 (Legacy) - Volume: 4,654 creates",
+              "confidence": "high",
+              "product": "Kite",
+              "origin": {
+                "name": "PRD: Reorganizing Offer types [Kite - Free Gift & Discounts]",
+                "author": null,
+                "date": "2026-05-26",
+                "url": "https://www.notion.so/PRD-Reorganizing Offer-types-36c7013d07a48008ad22f673addd6d92"
+              }
+            },
+            {
+              "id": "notion-005",
+              "type": "shipped_feature",
+              "content": "Kite shipping same-line discount stacking for Shopify Plus merchants to compete with other apps",
+              "evidence": "Shopify Plus now allows two product discounts on the same cart line item - Uses a tag-based mutual matching system - Competing apps already shipping this; Kite needs parity",
+              "confidence": "high",
+              "product": "Kite",
+              "origin": {
+                "name": "PRD: Line item Product discount combination [Kite - Free Gift & Discounts]",
+                "author": null,
+                "date": "2026-05-15",
+                "url": "https://www.notion.so/PRD-Line-item-Product-discount-combination-35e7013d07a4808597f1d150f04b8232"
+              }
+            },
+            {
+              "id": "notion-006",
+              "type": "competitive",
+              "content": "Competing apps already shipping same-line discount stacking functionality that Kite needs to match",
+              "evidence": "Competing apps already shipping this; Kite needs parity",
+              "confidence": "medium",
+              "product": "Kite",
+              "origin": {
+                "name": "PRD: Line item Product discount combination [Kite - Free Gift & Discounts]",
+                "author": null,
+                "date": "2026-05-15",
+                "url": "https://www.notion.so/PRD-Line-item-Product-discount-combination-35e7013d07a4808597f1d150f04b8232"
+              }
+            },
+            {
+              "id": "notion-007",
+              "type": "shipped_feature",
+              "content": "Product Marketing Engine launching AI-orchestrated content system targeting 3-5x content output without adding headcount",
+              "evidence": "3–5x content output without adding headcount - Every piece grounded in real customer insight, product reality, and SEO data - Consistent brand voice across every channel - Idea → published in days, not weeks",
+              "confidence": "high",
+              "product": "All",
+              "origin": {
+                "name": "Product Marketing Engine [Marketing All Apps]",
+                "author": null,
+                "date": "2026-05-26",
+                "url": "https://www.notion.so/Product-Marketing-Engine-36b7013d07a480578ac3f85e346d7993"
+              }
+            }
+          ],
+          "itemCount": 7,
+          "dateRange": "2026-05-05 to 2026-05-26",
+          "status": "success"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Run: GD Meeting Notes": [
+      {
+        "json": {
+          "source": "google_drive",
+          "signals": [
+            {
+              "id": "gdrive-1",
+              "type": "shipped_feature",
+              "content": "Fly Bundles multicurrency feature launched with fixed pricing per region independent of exchange rates",
+              "evidence": "System updates allow fixed multicurrency pricing independent of exchange rates. Pricing logic operates on a currency-based model rather than a country-specific approach",
+              "confidence": "high",
+              "product": "Fly Bundles",
+              "origin": {
+                "name": "Skai Lama Fly Bundles x Tommee Tippee",
+                "author": "Hiral Umrania, Harsh Bajaj",
+                "date": "2026-05-27",
+                "url": "https://docs.google.com/document/d/10VT3tjmSsfirU6zmDQTTHrL1zXjkqawn6sg_vdqt6Ik/edit"
+              }
+            },
+            {
+              "id": "gdrive-2",
+              "type": "commercial",
+              "content": "Tommee Tippee customer upgraded to multicurrency feature with manual billing adjustment due to payment errors",
+              "evidence": "Technical payment issues prevented plan upgrades. A manual billing adjustment for the end of the month was decided to resolve this blocker",
+              "confidence": "high",
+              "product": "Fly Bundles",
+              "origin": {
+                "name": "Skai Lama Fly Bundles x Tommee Tippee",
+                "author": "Harsh Bajaj, Heather Smales",
+                "date": "2026-05-27",
+                "url": "https://docs.google.com/document/d/10VT3tjmSsfirU6zmDQTTHrL1zXjkqawn6sg_vdqt6Ik/edit"
+              }
+            },
+            {
+              "id": "gdrive-3",
+              "type": "pain_point",
+              "content": "Kite app blocks gift card usage when buy-one-get-one discounts are active",
+              "evidence": "Gift cards fail when Kite discount promotions remain active. Resolution requires fixing this specific functional limitation",
+              "confidence": "high",
+              "product": "Kite",
+              "origin": {
+                "name": "Meeting May 27, 2026 at 22:13 IST",
+                "author": "Matej Vejr, Janet Nelson",
+                "date": "2026-05-27",
+                "url": "https://docs.google.com/document/d/1P2cEEoCwjEdGqFGwjlukQ5Z2lGjGHW9JaKqHxzFEgCE/edit"
+              }
+            },
+            {
+              "id": "gdrive-4",
+              "type": "commercial",
+              "content": "Kite pricing experiment planned to raise chargeable customer threshold from 50 to 100 orders at $29 price point",
+              "evidence": "Experiment with 100-order customer threshold The team will run an experiment in June to shift the paid customer threshold from 50 orders to 100 orders to assess the impact on recurring revenue",
+              "confidence": "high",
+              "product": "Kite",
+              "origin": {
+                "name": "Kite - Sprint Planning & Review",
+                "author": "Surya Varma, Sid B",
+                "date": "2026-05-27",
+                "url": "https://docs.google.com/document/d/18E3WrtW_bp2xV0lqiPRO5IDD5mF3fCG4zlBgMCTJyO0/edit"
+              }
+            },
+            {
+              "id": "gdrive-5",
+              "type": "pain_point",
+              "content": "Kite activation rate dropped to concerning levels requiring focused product-led growth initiatives",
+              "evidence": "The team identified low activation rates and decided to pivot from manual account management to product-led activation. This shift prioritizes self-initiated user journeys to improve overall engagement",
+              "confidence": "high",
+              "product": "Kite",
+              "origin": {
+                "name": "Kite - Sprint Planning & Review",
+                "author": "Surya Varma, Ishaan Kohli",
+                "date": "2026-05-27",
+                "url": "https://docs.google.com/document/d/18E3WrtW_bp2xV0lqiPRO5IDD5mF3fCG4zlBgMCTJyO0/edit"
+              }
+            },
+            {
+              "id": "gdrive-6",
+              "type": "commercial",
+              "content": "Kite pricing acceptance declined from 88% to 74% after new pricing plan launch",
+              "evidence": "Surya Varma noted a drop in overall pricing acceptance from 88% to 74% following the launch of the new pricing plan",
+              "confidence": "high",
+              "product": "Kite",
+              "origin": {
+                "name": "Kite - Sprint Planning & Review",
+                "author": "Surya Varma",
+                "date": "2026-05-27",
+                "url": "https://docs.google.com/document/d/18E3WrtW_bp2xV0lqiPRO5IDD5mF3fCG4zlBgMCTJyO0/edit"
+              }
+            },
+            {
+              "id": "gdrive-7",
+              "type": "customer_signal",
+              "content": "Multi Toys LLP approved as Easy Bundles collaborator with $49 pricing tier for 500-5,000 bundle volume",
+              "evidence": "They identified pricing tiers based on usage volume, specifically referencing a $49 charge for users handling between 500 and 5,000 bundles, alongside mentions of higher-tier pricing at $149",
+              "confidence": "high",
+              "product": "Easy Bundles",
+              "origin": {
+                "name": "Easy Bundles - Onboarding - Jatin Jayeshbhai Kuchara and Surya",
+                "author": "Shri, jatin kuchara",
+                "date": "2026-05-28",
+                "url": "https://docs.google.com/document/d/1wvuukoNGMl4tEsV4ecb3q7_0c104FEbvdzNBZNUxm0U/edit"
+              }
+            },
+            {
+              "id": "gdrive-8",
+              "type": "pain_point",
+              "content": "Fly Bundles customer experienced persistent pricing errors showing $59 instead of calculated bundle price",
+              "evidence": "Dana Khader raises an issue regarding a bundle on their store that displays a price of $59 instead of the expected amount calculated from two variants priced at $29 each",
+              "confidence": "high",
+              "product": "Fly Bundles",
+              "origin": {
+                "name": "Meeting May 28, 2026 at 10:54 IST",
+                "author": "Dana Khader, Shri",
+                "date": "2026-05-28",
+                "url": "https://docs.google.com/document/d/15bKrk6vkMjjbRq3FJHB-MMLAc83UkbCTJZtTuIbkgzE/edit"
+              }
+            },
+            {
+              "id": "gdrive-9",
+              "type": "customer_signal",
+              "content": "Partnerships program offers 20% lifetime commission to agencies for white label Shopify app solutions",
+              "evidence": "Ishaan Kohli detailed the affiliate program, which offers a 20% lifetime commission on subscription prices for anyone who installs the apps using a provided referral link",
+              "confidence": "high",
+              "product": "All",
+              "origin": {
+                "name": "Partnerships - Jaocb and Ishaan Kohli",
+                "author": "Ishaan Kohli, Jacob Bintig",
+                "date": "2026-05-27",
+                "url": "https://docs.google.com/document/d/12-tjen06aBu0HT_lMS36HEUOK9VNWWbAxPct2gujfFc/edit"
+              }
+            }
+          ],
+          "itemCount": 9,
+          "dateRange": "2026-05-27 to 2026-05-28",
+          "status": "success"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Run: Crisp": [
+      {
+        "json": {
+          "source": "crisp_kite",
+          "signals": [
+            {
+              "id": "crisp-kite-pain-1",
+              "type": "pain_point",
+              "content": "Create a step-by-step verification guide showing merchants how to check if their free gift or discount widget is rendering on storefront, cart, and checkout after setup.",
+              "evidence": "Free gift promotion visibility, Widget positioning issue, Free gift widget issue, Multiple gift selections on checkout, Widget not visible on app",
+              "confidence": "high",
+              "product": "Kite",
+              "merchantCount": 5,
+              "merchantExamples": [
+                "Setosa Skin PK",
+                "Curtainry",
+                "Ole Henriksen",
+                "Tire Streets",
+                "Point بوينت"
+              ],
+              "origin": {
+                "name": "Crisp live chat — Kite",
+                "author": "",
+                "date": "2026-06-04",
+                "url": "https://app.crisp.chat/website/c3ce4e99-bdbd-4d1f-8d92-bdf50d644d32/inbox/"
+              }
+            },
+            {
+              "id": "crisp-kite-pain-2",
+              "type": "pain_point",
+              "content": "Document the difference between V2 auto-apply and manual-select modes with screenshots and use cases for when each is appropriate.",
+              "evidence": "FreeGift V2 Troubleshoot, Strike-through price visibility request, Needs setup setup assistance",
+              "confidence": "high",
+              "product": "Kite",
+              "merchantCount": 3,
+              "merchantExamples": [
+                "ROCKBROS-DE",
+                "New Era PH",
+                "Flawless Vape Shop"
+              ],
+              "origin": {
+                "name": "Crisp live chat — Kite",
+                "author": "",
+                "date": "2026-06-04",
+                "url": "https://app.crisp.chat/website/c3ce4e99-bdbd-4d1f-8d92-bdf50d644d32/inbox/"
+              }
+            },
+            {
+              "id": "crisp-kite-pain-3",
+              "type": "pain_point",
+              "content": "Explain how Kite calculates gift inventory and applies rules when multiple free gift campaigns run simultaneously.",
+              "evidence": "Product gift balance issue, Confirmation on promo creation",
+              "confidence": "medium",
+              "product": "Kite",
+              "merchantCount": 2,
+              "merchantExamples": [
+                "María Orbai",
+                "FYLL"
+              ],
+              "origin": {
+                "name": "Crisp live chat — Kite",
+                "author": "",
+                "date": "2026-06-04",
+                "url": "https://app.crisp.chat/website/c3ce4e99-bdbd-4d1f-8d92-bdf50d644d32/inbox/"
+              }
+            },
+            {
+              "id": "crisp-kite-hvc-4",
+              "type": "commercial",
+              "content": "Top-performing merchant by app revenue hit free gift widget issue on July 21—needs immediate support to unblock; signals potential churn risk for high-value customer.",
+              "evidence": "Ole Henriksen (GMV: $521363, App Revenue: $125212.43): Top-performing merchant by app revenue hit free gift widget issue on July 21—needs immediate support to unblock; signals potential churn risk for high-value customer.",
+              "confidence": "high",
+              "product": "Kite",
+              "origin": {
+                "name": "Crisp live chat — Kite",
+                "author": "Ole Henriksen",
+                "date": "2026-06-04",
+                "url": "https://app.crisp.chat/website/c3ce4e99-bdbd-4d1f-8d92-bdf50d644d32/inbox/"
+              }
+            },
+            {
+              "id": "crisp-kite-hvc-5",
+              "type": "commercial",
+              "content": "Highest GMV merchant installed Kite but has $0 app revenue; asked about multiple gift selections on checkout July 26, indicating active setup phase—needs successful first campaign to activate.",
+              "evidence": "Tire Streets (GMV: $1186506, App Revenue: $0): Highest GMV merchant installed Kite but has $0 app revenue; asked about multiple gift selections on checkout July 26, indicating active setup phase—needs successful first campaign to activate.",
+              "confidence": "high",
+              "product": "Kite",
+              "origin": {
+                "name": "Crisp live chat — Kite",
+                "author": "Tire Streets",
+                "date": "2026-06-04",
+                "url": "https://app.crisp.chat/website/c3ce4e99-bdbd-4d1f-8d92-bdf50d644d32/inbox/"
+              }
+            },
+            {
+              "id": "crisp-kite-hvc-6",
+              "type": "commercial",
+              "content": "Second-highest GMV and app revenue ($220K); no topic recorded, status closed July 29—check if they're satisfied or quietly churning.",
+              "evidence": "Europesnus.com (GMV: $1201534, App Revenue: $220335.87): Second-highest GMV and app revenue ($220K); no topic recorded, status closed July 29—check if they're satisfied or quietly churning.",
+              "confidence": "high",
+              "product": "Kite",
+              "origin": {
+                "name": "Crisp live chat — Kite",
+                "author": "Europesnus.com",
+                "date": "2026-06-04",
+                "url": "https://app.crisp.chat/website/c3ce4e99-bdbd-4d1f-8d92-bdf50d644d32/inbox/"
+              }
+            },
+            {
+              "id": "crisp-kite-hvc-7",
+              "type": "commercial",
+              "content": "Shopify Plus merchant asked for strike-through price visibility request Aug 2; mid-size revenue suggests they're scaling campaigns and need visual customization options.",
+              "evidence": "New Era PH (GMV: $45730, App Revenue: $13385.9): Shopify Plus merchant asked for strike-through price visibility request Aug 2; mid-size revenue suggests they're scaling campaigns and need visual customization options.",
+              "confidence": "high",
+              "product": "Kite",
+              "origin": {
+                "name": "Crisp live chat — Kite",
+                "author": "New Era PH",
+                "date": "2026-06-04",
+                "url": "https://app.crisp.chat/website/c3ce4e99-bdbd-4d1f-8d92-bdf50d644d32/inbox/"
+              }
+            },
+            {
+              "id": "crisp-kite-hvc-8",
+              "type": "commercial",
+              "content": "High GMV, zero app revenue; FreeGift V2 troubleshoot request June 25 indicates setup friction prevented campaign launch—activation gap.",
+              "evidence": "ROCKBROS-DE (GMV: $618908, App Revenue: $0): High GMV, zero app revenue; FreeGift V2 troubleshoot request June 25 indicates setup friction prevented campaign launch—activation gap.",
+              "confidence": "high",
+              "product": "Kite",
+              "origin": {
+                "name": "Crisp live chat — Kite",
+                "author": "ROCKBROS-DE",
+                "date": "2026-06-04",
+                "url": "https://app.crisp.chat/website/c3ce4e99-bdbd-4d1f-8d92-bdf50d644d32/inbox/"
+              }
+            }
+          ],
+          "crispSummary": "Five merchants across Basic/Plus/Shopify Plus plans are blocked on offer visibility—they've set up campaigns but can't confirm customers see them. Ole Henriksen ($521K GMV, $125K app revenue) and Tire Streets ($1.2M GMV) both hit free gift widget issues. Three Shopify Plus merchants (New Era PH $45K GMV, Flawless Vape Shop $30K GMV, ROCKBROS-DE $618K GMV) asked about setup assistance or V2 troubleshooting, signaling friction in free gift configuration.",
+          "contentOpportunities": [
+            {
+              "title": "Verify Your Free Gift Is Live: Troubleshooting Widget Visibility",
+              "whyNow": "Five merchants this week couldn't confirm their free gift or discount widget was showing to customers after setup. Setosa Skin PK, Curtainry, Ole Henriksen, Tire Streets, and Point بوينت all reported visibility gaps.",
+              "funnelStage": "Retention"
+            },
+            {
+              "title": "FreeGift V2 Setup Guide: Auto-Apply vs. Manual Selection",
+              "whyNow": "ROCKBROS-DE, New Era PH, and Flawless Vape Shop all requested setup assistance or V2 troubleshooting between June 25 and Aug 2, indicating confusion over how the new toggle works.",
+              "funnelStage": "Decision"
+            },
+            {
+              "title": "Managing Multiple Free Gift Campaigns: Inventory and Rule Precedence",
+              "whyNow": "María Orbai asked about product gift balance issues and FYLL sought confirmation on promo creation, both signaling need for clarity on how Kite stacks and prioritizes rules.",
+              "funnelStage": "Retention"
+            }
+          ],
+          "itemCount": 8,
+          "dateRange": "2026-05-28 to 2026-06-04",
+          "status": "success"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "source": "crisp_eb",
+          "signals": [
+            {
+              "id": "crisp-eb-pain-1",
+              "type": "pain_point",
+              "content": "Create a troubleshooting guide for discount application on bundled products, covering price tiers and Shopify plan limitations.",
+              "evidence": "Bundle discount issue, Discount on $50 hats not working, App's discount collection issue",
+              "confidence": "high",
+              "product": "Easy Bundles",
+              "merchantCount": 3,
+              "merchantExamples": [
+                "SHE VICTOR",
+                "webbwestern",
+                "ODEN"
+              ],
+              "origin": {
+                "name": "Crisp live chat — Easy Bundles",
+                "author": "",
+                "date": "2026-06-04",
+                "url": "https://app.crisp.chat/website/b3910a47-66c1-43ab-b044-8b97762f4a6b/inbox/"
+              }
+            },
+            {
+              "id": "crisp-eb-pain-2",
+              "type": "pain_point",
+              "content": "Document step-by-step configurator setup and third-party app compatibility requirements for merchants evaluating integrations.",
+              "evidence": "Configurator setup, Cannot integrate Fly Bundle app with Easy",
+              "confidence": "medium",
+              "product": "Easy Bundles",
+              "merchantCount": 2,
+              "merchantExamples": [
+                "eve",
+                "On Her Desk"
+              ],
+              "origin": {
+                "name": "Crisp live chat — Easy Bundles",
+                "author": "",
+                "date": "2026-06-04",
+                "url": "https://app.crisp.chat/website/b3910a47-66c1-43ab-b044-8b97762f4a6b/inbox/"
+              }
+            },
+            {
+              "id": "crisp-eb-win-3",
+              "type": "customer_signal",
+              "content": "Novoma ($350K GMV) resolved team access issues and achieved smooth cross-functional collaboration on the app.",
+              "evidence": "Novoma: Novoma ($350K GMV) resolved team access issues and achieved smooth cross-functional collaboration on the app.",
+              "confidence": "medium",
+              "product": "Easy Bundles",
+              "origin": {
+                "name": "Crisp live chat — Easy Bundles",
+                "author": "Novoma",
+                "date": "2026-06-04",
+                "url": "https://app.crisp.chat/website/b3910a47-66c1-43ab-b044-8b97762f4a6b/inbox/"
+              }
+            },
+            {
+              "id": "crisp-eb-hvc-4",
+              "type": "commercial",
+              "content": "Discount collection feature not working as expected—this is the app's highest-revenue customer and the issue blocks core bundling value.",
+              "evidence": "ODEN (GMV: $533100, App Revenue: $390919.38): Discount collection feature not working as expected—this is the app's highest-revenue customer and the issue blocks core bundling value.",
+              "confidence": "high",
+              "product": "Easy Bundles",
+              "origin": {
+                "name": "Crisp live chat — Easy Bundles",
+                "author": "ODEN",
+                "date": "2026-06-04",
+                "url": "https://app.crisp.chat/website/b3910a47-66c1-43ab-b044-8b97762f4a6b/inbox/"
+              }
+            },
+            {
+              "id": "crisp-eb-hvc-5",
+              "type": "commercial",
+              "content": "Requesting Australian market-specific bundle options; signals potential geographic expansion need for ANZ merchants.",
+              "evidence": "Real World NZ (GMV: $186183, App Revenue: $27670.29): Requesting Australian market-specific bundle options; signals potential geographic expansion need for ANZ merchants.",
+              "confidence": "high",
+              "product": "Easy Bundles",
+              "origin": {
+                "name": "Crisp live chat — Easy Bundles",
+                "author": "Real World NZ",
+                "date": "2026-06-04",
+                "url": "https://app.crisp.chat/website/b3910a47-66c1-43ab-b044-8b97762f4a6b/inbox/"
+              }
+            },
+            {
+              "id": "crisp-eb-hvc-6",
+              "type": "commercial",
+              "content": "Translation request—Shopify Plus merchant indicates localization is a barrier for non-English markets.",
+              "evidence": "Nail4you.dk (GMV: $189320, App Revenue: $3321.78): Translation request—Shopify Plus merchant indicates localization is a barrier for non-English markets.",
+              "confidence": "high",
+              "product": "Easy Bundles",
+              "origin": {
+                "name": "Crisp live chat — Easy Bundles",
+                "author": "Nail4you.dk",
+                "date": "2026-06-04",
+                "url": "https://app.crisp.chat/website/b3910a47-66c1-43ab-b044-8b97762f4a6b/inbox/"
+              }
+            },
+            {
+              "id": "crisp-eb-hvc-7",
+              "type": "commercial",
+              "content": "Needs color matching for bundle display; feature request signals product customization gaps for mid-market merchants.",
+              "evidence": "ibigboi.com (GMV: $217256, App Revenue: $6119.76): Needs color matching for bundle display; feature request signals product customization gaps for mid-market merchants.",
+              "confidence": "high",
+              "product": "Easy Bundles",
+              "origin": {
+                "name": "Crisp live chat — Easy Bundles",
+                "author": "ibigboi.com",
+                "date": "2026-06-04",
+                "url": "https://app.crisp.chat/website/b3910a47-66c1-43ab-b044-8b97762f4a6b/inbox/"
+              }
+            }
+          ],
+          "crispSummary": "This week's support load is sparse and fragmented with no dominant themes. ODEN ($533K GMV, $391K app revenue) flagged a discount collection issue—our highest-value merchant this period. Three merchants across different weeks reported discount problems (SHE VICTOR, webbwestern, ODEN), suggesting recurring friction in bundle discount logic. Eve and On Her Desk both hit configurator/integration friction during setup. Most conversations lack detail, making pattern extraction difficult.",
+          "contentOpportunities": [
+            {
+              "title": "Why Bundle Discounts Fail (and How to Fix Them)",
+              "whyNow": "Three merchants this week reported discount application failures across different bundle configurations. ODEN's $391K app revenue at stake.",
+              "funnelStage": "Retention"
+            },
+            {
+              "title": "Easy Bundles + Third-Party App Compatibility: What Works",
+              "whyNow": "On Her Desk blocked on Fly Bundle integration; eve stuck on configurator setup. Integration friction during decision phase.",
+              "funnelStage": "Decision"
+            },
+            {
+              "title": "Localizing Bundles for International Merchants",
+              "whyNow": "Nail4you.dk (Plus plan, $189K GMV) requested translations; Real World NZ seeking Australian market customization. Language and geography gaps emerging.",
+              "funnelStage": "Consideration"
+            }
+          ],
+          "itemCount": 7,
+          "dateRange": "2026-05-28 to 2026-06-04",
+          "status": "success"
+        },
+        "pairedItem": {
+          "item": 0,
+          "input": 1
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Input: Receive Trigger": {
+      "main": [
+        [
+          {
+            "node": "Config: Signal Intelligence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config: Signal Intelligence": {
+      "main": [
+        [
+          {
+            "node": "Run: Slack Signals",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Run: Notion Signals",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Run: GD Meeting Notes",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Run: Crisp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run: Slack Signals": {
+      "main": [
+        [
+          {
+            "node": "Merge: All Sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run: Notion Signals": {
+      "main": [
+        [
+          {
+            "node": "Merge: All Sources",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Run: GD Meeting Notes": {
+      "main": [
+        [
+          {
+            "node": "Merge: All Sources",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge: All Sources": {
+      "main": [
+        [
+          {
+            "node": "Collate: All Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collate: All Signals": {
+      "main": [
+        [
+          {
+            "node": "Fetch: Universal Distiller Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch: Universal Distiller Prompt": {
+      "main": [
+        [
+          {
+            "node": "Build: Distiller Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build: Distiller Context": {
+      "main": [
+        [
+          {
+            "node": "Universal Distiller",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Universal Distiller": {
+      "main": [
+        [
+          {
+            "node": "Parse: Distiller Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse: Distiller Output": {
+      "main": [
+        [
+          {
+            "node": "Output: Signal Digest Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run: Crisp": {
+      "main": [
+        [
+          {
+            "node": "Merge: All Sources",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  },
+  "versionId": "ebf3ed04-d600-4667-ba26-b0dd9beb22b7",
+  "meta": {
+    "instanceId": "589cc82bfaef6a48e49f76563ee242289190c24e109e0fc3320975755d230378"
+  },
+  "id": "ZrElSIoj604dlGEU",
+  "tags": []
+}

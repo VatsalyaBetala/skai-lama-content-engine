@@ -1,0 +1,453 @@
+{
+  "name": "Subflow: Crisp",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://api.crisp.chat/v1/website/c3ce4e99-bdbd-4d1f-8d92-bdf50d644d32/conversations/1",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Crisp-Tier",
+              "value": "website"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        224,
+        -176
+      ],
+      "id": "f5757ce3-c223-4f9a-b875-760ba9df3f21",
+      "name": "Crisp: Fetch Kite Workspace",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ChAsnI4e7JVQOfDn",
+          "name": "Crisp - Kite API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.crisp.chat/v1/website/b3910a47-66c1-43ab-b044-8b97762f4a6b/conversations/1?page_number=1",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Crisp-Tier",
+              "value": "website"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        224,
+        16
+      ],
+      "id": "7def511c-36fe-473d-be59-4132537b4b80",
+      "name": "Crisp: Fetch EB Workspace",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "OeI7f9E8GKLJQRtl",
+          "name": "Crisp - EB API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst conversations = input.data?.items || input.data || [];\n\nconst sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);\n\nconst filtered = conversations.filter(c => {\n  const updatedRecently = (c.updated_at * 1000) > sevenDaysAgo; // Crisp uses seconds not ms\n  return updatedRecently;\n});\n\nconst signals = filtered.map(c => ({\n  topic: c.meta?.subject || c.topic || '(no topic)',\n  lastMessage: c.last_message?.content || '',\n  segments: c.meta?.segments || [],\n  merchantName: c.meta?.nickname || '',\n  shopifyPlan: c.meta?.data?.shopify_plan || '',\n  appPlan: c.meta?.data?.app_plan || '',\n  monthlyRevenue: c.meta?.data?.last_30_days_app_revenue_usd || 0,\n  gmv: c.meta?.data?.last_month_gmv_usd || 0,\n  state: c.status || c.state,\n  updatedAt: new Date(c.updated_at * 1000).toISOString().split('T')[0]\n}));\n\nconsole.log(`Total: ${conversations.length} | Filtered: ${filtered.length}`);\n\nreturn [{ json: { signals, count: signals.length } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        -176
+      ],
+      "id": "05998c4e-5807-4bc6-a1c0-325f5f110ee3",
+      "name": "Crisp: Kite - Filter Last 7 Days"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst conversations = input.data?.items || input.data || [];\n\nconst sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);\n\nconst filtered = conversations.filter(c => {\n  const updatedRecently = (c.updated_at * 1000) > sevenDaysAgo; // Crisp uses seconds not ms\n  return updatedRecently;\n});\n\nconst signals = filtered.map(c => ({\n  topic: c.meta?.subject || c.topic || '(no topic)',\n  lastMessage: c.last_message?.content || '',\n  segments: c.meta?.segments || [],\n  merchantName: c.meta?.nickname || '',\n  shopifyPlan: c.meta?.data?.shopify_plan || '',\n  appPlan: c.meta?.data?.app_plan || '',\n  monthlyRevenue: c.meta?.data?.last_30_days_app_revenue_usd || 0,\n  gmv: c.meta?.data?.last_month_gmv_usd || 0,\n  state: c.status || c.state,\n  updatedAt: new Date(c.updated_at * 1000).toISOString().split('T')[0]\n}));\n\nconsole.log(`Total: ${conversations.length} | Filtered: ${filtered.length}`);\n\nreturn [{ json: { signals, count: signals.length } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        16
+      ],
+      "id": "e69065b0-f315-4fa9-b2f3-c793ff03fa37",
+      "name": "Crisp: EB - Filter Last 7 Days"
+    },
+    {
+      "parameters": {
+        "url": "https://api.notion.com/v1/blocks/3757013d-07a4-807d-a132-d4a1cc5cecd0/children",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        672,
+        16
+      ],
+      "id": "b51f5d63-ae48-40be-8e44-873f97aa7447",
+      "name": "Crisp: EB - Fetch Distiller Prompt",
+      "credentials": {
+        "notionApi": {
+          "id": "bJLSXb7rDb4zr6O5",
+          "name": "Notion - Vatsalya"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const { signals, count } = $('Crisp: EB - Filter Last 7 Days').first().json;\n\n// Extract prompt from Notion code block\nconst blocks = $input.first().json.results || [];\nlet distillerPrompt = '';\n\nfor (const block of blocks) {\n  if (block.type === 'code') {\n    distillerPrompt = block.code?.rich_text?.map(r => r.plain_text).join('') || '';\n    break;\n  }\n}\n\nif (!distillerPrompt) {\n  throw new Error('Crisp Distiller prompt not found on Notion page 3757013d-07a4-807d-a132-d4a1cc5cecd0');\n}\n\nconst conversationText = signals.map((c, i) =>\n  `[${i+1}] Topic: ${c.topic}\nMerchant: ${c.merchantName} | Plan: ${c.shopifyPlan} | App Revenue (30d): $${c.monthlyRevenue} | GMV: $${c.gmv}\nLast message: ${c.lastMessage}\nStatus: ${c.state} | Date: ${c.updatedAt}\n---`\n).join('\\n');\n\nconst fullPrompt = `${distillerPrompt}\n\nCONVERSATIONS (${count} total, last 7 days):\n${conversationText}`;\n\nreturn [{ json: { distillerPrompt: fullPrompt, count } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        16
+      ],
+      "id": "2bf0a23d-ac84-450b-b82b-6ea1de322e75",
+      "name": "Crisp: EB - Build Distiller Context"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: \"claude-haiku-4-5-20251001\",\n  max_tokens: 3000,\n  messages: [{ role: \"user\", content: $json.distillerPrompt }]\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1120,
+        -176
+      ],
+      "id": "d6a70221-df4b-45a3-ba2c-c48459d88376",
+      "name": "Crsip: Kite - Distiller",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "feoW1VBDikCNaQ3D",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: \"claude-haiku-4-5-20251001\",\n  max_tokens: 3000,\n  messages: [{ role: \"user\", content: $json.distillerPrompt }]\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1120,
+        16
+      ],
+      "id": "d2ff6a3f-6d42-4ffa-bb53-088563e89476",
+      "name": "Crsip: EB - Distiller",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "feoW1VBDikCNaQ3D",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst rawText = response.content?.[0]?.text || '';\n\nconst today = new Date().toISOString().split('T')[0];\nconst sevenDaysAgo = new Date(Date.now() - 7*24*60*60*1000).toISOString().split('T')[0];\n\nlet parsed;\ntry {\n  const clean = rawText.replace(/```json|```/g, '').trim();\n  parsed = JSON.parse(clean);\n} catch(e) {\n  return [{\n    json: {\n      source: 'crisp_eb',\n      signals: [],\n      itemCount: 0,\n      dateRange: `${sevenDaysAgo} to ${today}`,\n      status: 'error',\n      error: `Parse failed: ${e.message}`\n    }\n  }];\n}\n\n// Convert Crisp-specific schema → Collector Base Prompt schema\nconst signals = [];\n\n// Pain points → signals\nfor (const p of (parsed.painPoints || [])) {\n  signals.push({\n    id: `crisp-eb-pain-${signals.length + 1}`,\n    type: 'pain_point',\n    content: p.contentOpportunity || p.theme,\n    evidence: p.verbatimSignal || '',\n    confidence: p.frequency >= 3 ? 'high' : p.frequency >= 2 ? 'medium' : 'low',\n    product: 'Easy Bundles',\n    merchantCount: p.frequency || 1,\n    merchantExamples: p.merchantExamples || [],\n    origin: {\n      name: 'Crisp live chat — Easy Bundles',\n      author: '',\n      date: today,\n      url: `https://app.crisp.chat/website/b3910a47-66c1-43ab-b044-8b97762f4a6b/inbox/`\n    }\n  });\n}\n\n// Positive signals → customer_signal type\nfor (const p of (parsed.positiveSignals || [])) {\n  signals.push({\n    id: `crisp-eb-win-${signals.length + 1}`,\n    type: 'customer_signal',\n    content: p.signal || p.theme,\n    evidence: `${p.merchantExample}: ${p.signal}`,\n    confidence: 'medium',\n    product: 'Easy Bundles',\n    origin: {\n      name: 'Crisp live chat — Easy Bundles',\n      author: p.merchantExample || '',\n      date: today,\n      url: `https://app.crisp.chat/website/b3910a47-66c1-43ab-b044-8b97762f4a6b/inbox/`\n    }\n  });\n}\n\n// HVC signals → commercial type\nfor (const h of (parsed.highValueMerchantSignals || [])) {\n  signals.push({\n    id: `crisp-eb-hvc-${signals.length + 1}`,\n    type: 'commercial',\n    content: h.signal,\n    evidence: `${h.merchant} (GMV: $${h.gmv}, App Revenue: $${h.appRevenue}): ${h.signal}`,\n    confidence: 'high',\n    product: 'Easy Bundles',\n    origin: {\n      name: 'Crisp live chat — Easy Bundles',\n      author: h.merchant || '',\n      date: today,\n      url: `https://app.crisp.chat/website/b3910a47-66c1-43ab-b044-8b97762f4a6b/inbox/`\n    }\n  });\n}\n\nreturn [{\n  json: {\n    source: 'crisp_eb',\n    signals,\n    crispSummary: parsed.crispSummary || '',\n    contentOpportunities: parsed.contentOpportunities || [],\n    itemCount: signals.length,\n    dateRange: `${sevenDaysAgo} to ${today}`,\n    status: signals.length > 0 ? 'success' : 'empty'\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        16
+      ],
+      "id": "7f9b5462-1b36-47fd-953c-546fd881b529",
+      "name": "Crisp: EB - Parse Distiller Output"
+    },
+    {
+      "parameters": {
+        "url": "https://api.notion.com/v1/blocks/3757013d-07a4-81d2-be3b-e7ecd9549278/children",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        672,
+        -176
+      ],
+      "id": "d7214ed0-68a7-4656-9b2d-b6bab36b2ca0",
+      "name": "Crisp: Kite - Fetch Distiller Prompt",
+      "credentials": {
+        "notionApi": {
+          "id": "bJLSXb7rDb4zr6O5",
+          "name": "Notion - Vatsalya"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const { signals, count } = $('Crisp: Kite - Filter Last 7 Days').first().json;\n\n// Extract prompt from Notion code block\nconst blocks = $input.first().json.results || [];\nlet distillerPrompt = '';\n\nfor (const block of blocks) {\n  if (block.type === 'code') {\n    distillerPrompt = block.code?.rich_text?.map(r => r.plain_text).join('') || '';\n    break;\n  }\n}\n\nif (!distillerPrompt) {\n  throw new Error('Crisp Distiller prompt not found on Notion page 3757013d-07a4-807d-a132-d4a1cc5cecd0');\n}\n\nconst conversationText = signals.map((c, i) =>\n  `[${i+1}] Topic: ${c.topic}\nMerchant: ${c.merchantName} | Plan: ${c.shopifyPlan} | App Revenue (30d): $${c.monthlyRevenue} | GMV: $${c.gmv}\nLast message: ${c.lastMessage}\nStatus: ${c.state} | Date: ${c.updatedAt}\n---`\n).join('\\n');\n\nconst fullPrompt = `${distillerPrompt}\n\nCONVERSATIONS (${count} total, last 7 days):\n${conversationText}`;\n\nreturn [{ json: { distillerPrompt: fullPrompt, count } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        -176
+      ],
+      "id": "6b37d8d7-4a4c-4756-8956-a012a10de81a",
+      "name": "Crisp: Kite - Build Distiller Context"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst rawText = response.content?.[0]?.text || '';\n\nconst today = new Date().toISOString().split('T')[0];\nconst sevenDaysAgo = new Date(Date.now() - 7*24*60*60*1000).toISOString().split('T')[0];\n\nlet parsed;\ntry {\n  let clean = rawText\n    .replace(/```json\\s*/g, '')\n    .replace(/```\\s*/g, '')\n    .trim();\n\n  // Extract between first { and last }\n  const firstBrace = clean.indexOf('{');\n  const lastBrace = clean.lastIndexOf('}');\n  if (firstBrace !== -1 && lastBrace !== -1) {\n    clean = clean.substring(firstBrace, lastBrace + 1);\n  }\n\n  // Fix trailing commas before } or ] — the most common Claude JSON error\n  clean = clean.replace(/,(\\s*[}\\]])/g, '$1');\n\n  parsed = JSON.parse(clean);\n} catch(e) {\n  return [{\n    json: {\n      source: 'crisp_kite',\n      signals: [],\n      itemCount: 0,\n      dateRange: `${sevenDaysAgo} to ${today}`,\n      status: 'error',\n      error: `Parse failed: ${e.message}`\n    }\n  }];\n}\n\nconst signals = [];\n\nfor (const p of (parsed.painPoints || [])) {\n  signals.push({\n    id: `crisp-kite-pain-${signals.length + 1}`,\n    type: 'pain_point',\n    content: p.contentOpportunity || p.theme,\n    evidence: p.verbatimSignal || '',\n    confidence: p.frequency >= 3 ? 'high' : p.frequency >= 2 ? 'medium' : 'low',\n    product: 'Kite',\n    merchantCount: p.frequency || 1,\n    merchantExamples: p.merchantExamples || [],\n    origin: {\n      name: 'Crisp live chat — Kite',\n      author: '',\n      date: today,\n      url: 'https://app.crisp.chat/website/c3ce4e99-bdbd-4d1f-8d92-bdf50d644d32/inbox/'\n    }\n  });\n}\n\nfor (const p of (parsed.positiveSignals || [])) {\n  signals.push({\n    id: `crisp-kite-win-${signals.length + 1}`,\n    type: 'customer_signal',\n    content: p.signal || p.theme,\n    evidence: `${p.merchantExample}: ${p.signal}`,\n    confidence: 'medium',\n    product: 'Kite',\n    origin: {\n      name: 'Crisp live chat — Kite',\n      author: p.merchantExample || '',\n      date: today,\n      url: 'https://app.crisp.chat/website/c3ce4e99-bdbd-4d1f-8d92-bdf50d644d32/inbox/'\n    }\n  });\n}\n\nfor (const h of (parsed.highValueMerchantSignals || [])) {\n  signals.push({\n    id: `crisp-kite-hvc-${signals.length + 1}`,\n    type: 'commercial',\n    content: h.signal,\n    evidence: `${h.merchant} (GMV: $${h.gmv}, App Revenue: $${h.appRevenue}): ${h.signal}`,\n    confidence: 'high',\n    product: 'Kite',\n    origin: {\n      name: 'Crisp live chat — Kite',\n      author: h.merchant || '',\n      date: today,\n      url: 'https://app.crisp.chat/website/c3ce4e99-bdbd-4d1f-8d92-bdf50d644d32/inbox/'\n    }\n  });\n}\n\nreturn [{\n  json: {\n    source: 'crisp_kite',\n    signals,\n    crispSummary: parsed.crispSummary || '',\n    contentOpportunities: parsed.contentOpportunities || [],\n    itemCount: signals.length,\n    dateRange: `${sevenDaysAgo} to ${today}`,\n    status: signals.length > 0 ? 'success' : 'empty'\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        -176
+      ],
+      "id": "4ad82618-d807-4aef-8a93-ddf9b6298eb6",
+      "name": "Crisp: Kite - Parse Distiller Output"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1600,
+        -80
+      ],
+      "id": "5d417c72-7033-4b0a-b46e-fd426e8fef20",
+      "name": "Crisp: Merge Output Signals"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -16,
+        -64
+      ],
+      "id": "19a6a116-20cf-48ff-9f63-c3154f3b1ea9",
+      "name": "Input: Recieve Trigger"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Crisp: Fetch EB Workspace": {
+      "main": [
+        [
+          {
+            "node": "Crisp: EB - Filter Last 7 Days",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crisp: Fetch Kite Workspace": {
+      "main": [
+        [
+          {
+            "node": "Crisp: Kite - Filter Last 7 Days",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crisp: Kite - Filter Last 7 Days": {
+      "main": [
+        [
+          {
+            "node": "Crisp: Kite - Fetch Distiller Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crisp: EB - Filter Last 7 Days": {
+      "main": [
+        [
+          {
+            "node": "Crisp: EB - Fetch Distiller Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crisp: EB - Fetch Distiller Prompt": {
+      "main": [
+        [
+          {
+            "node": "Crisp: EB - Build Distiller Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crisp: EB - Build Distiller Context": {
+      "main": [
+        [
+          {
+            "node": "Crsip: EB - Distiller",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crsip: Kite - Distiller": {
+      "main": [
+        [
+          {
+            "node": "Crisp: Kite - Parse Distiller Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crsip: EB - Distiller": {
+      "main": [
+        [
+          {
+            "node": "Crisp: EB - Parse Distiller Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crisp: Kite - Fetch Distiller Prompt": {
+      "main": [
+        [
+          {
+            "node": "Crisp: Kite - Build Distiller Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crisp: Kite - Build Distiller Context": {
+      "main": [
+        [
+          {
+            "node": "Crsip: Kite - Distiller",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crisp: Kite - Parse Distiller Output": {
+      "main": [
+        [
+          {
+            "node": "Crisp: Merge Output Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crisp: EB - Parse Distiller Output": {
+      "main": [
+        [
+          {
+            "node": "Crisp: Merge Output Signals",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Input: Recieve Trigger": {
+      "main": [
+        [
+          {
+            "node": "Crisp: Fetch Kite Workspace",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Crisp: Fetch EB Workspace",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "2644931e-ded6-433f-a39e-826f2d8ffaab",
+  "meta": {
+    "instanceId": "589cc82bfaef6a48e49f76563ee242289190c24e109e0fc3320975755d230378"
+  },
+  "id": "WG07q6U68n9CppvG",
+  "tags": []
+}

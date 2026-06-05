@@ -1,0 +1,759 @@
+{
+  "name": "Subflow: Notion",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"query\": \"product update feature shipped\", \"page_size\": 5, \"sort\": {\"direction\": \"descending\", \"timestamp\": \"last_edited_time\"}}",
+        "options": {}
+      },
+      "id": "109e0472-6ffe-4e80-8fa0-061202e02257",
+      "name": "L1: Notion Search — Features",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        496
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "bJLSXb7rDb4zr6O5",
+          "name": "Notion - Vatsalya"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"query\": \"customer feedback merchant problem\", \"page_size\": 5, \"sort\": {\"direction\": \"descending\", \"timestamp\": \"last_edited_time\"}}",
+        "options": {}
+      },
+      "id": "58b462cb-3d93-4c3f-947b-6c02cc1e616c",
+      "name": "L1: Notion Search — Customer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        304
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "bJLSXb7rDb4zr6O5",
+          "name": "Notion - Vatsalya"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"query\": \"PRD initiative roadmap\", \"page_size\": 5, \"sort\": {\"direction\": \"descending\", \"timestamp\": \"last_edited_time\"}}",
+        "options": {}
+      },
+      "id": "593be14e-774e-4583-826a-752b757effef",
+      "name": "L1: Notion Search — PRDs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        112
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "bJLSXb7rDb4zr6O5",
+          "name": "Notion - Vatsalya"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"query\": \"analytics revenue metrics\", \"page_size\": 5, \"sort\": {\"direction\": \"descending\", \"timestamp\": \"last_edited_time\"}}",
+        "options": {}
+      },
+      "id": "d52d315c-6d74-4253-8cf1-6e2f949de887",
+      "name": "L1: Notion Search — Analytics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        -80
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "bJLSXb7rDb4zr6O5",
+          "name": "Notion - Vatsalya"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "dateToday"
+            },
+            {
+              "name": "dateLastMonday"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -448,
+        256
+      ],
+      "id": "02e7d546-0447-4876-bec0-e45febfbe058",
+      "name": "Input: Receive Trigger"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "99be8623-a632-4b1f-8ca4-901100754843",
+              "name": "dateToday",
+              "value": "={{ $('Input: Receive Trigger').first().json.dateToday }}",
+              "type": "string"
+            },
+            {
+              "id": "747b5510-8d52-4984-a6d1-ff19fe31824a",
+              "name": "dateLastMonday",
+              "value": "={{ $('Input: Receive Trigger').first().json.dateLastMonday }}",
+              "type": "string"
+            },
+            {
+              "id": "9f191b71-7bdd-4723-adfc-77cd9bd92aaa",
+              "name": "notionVersion",
+              "value": "2022-06-28",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -256,
+        256
+      ],
+      "id": "2b617ee4-15e7-4f98-bc25-51b0a181f178",
+      "name": "Config: Notion Subflow"
+    },
+    {
+      "parameters": {
+        "numberInputs": 4
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        272,
+        176
+      ],
+      "id": "e96c9e9a-0036-4729-b749-07ccca4480cf",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "const allItems = $input.all();\n\nlet rawContext = '';\nlet allPages = [];\n\nfor (const item of allItems) {\n  const results = item.json.results || [];\n  \n  for (const page of results) {\n    const title = page.properties?.Name?.title?.[0]?.plain_text\n      || page.properties?.title?.title?.[0]?.plain_text\n      || 'Untitled';\n    \n    const type = page.properties?.Type?.select?.name\n      || page.properties?.['Document Type']?.select?.name\n      || '';\n    \n    const app = page.properties?.App?.select?.name || '';\n    const pillar = page.properties?.Pillar?.select?.name || '';\n    const status = page.properties?.Status?.select?.name || '';\n    const initiativeStatus = page.properties?.['Initiative Status']?.select?.name || '';\n    const owner = page.properties?.Owner?.people?.[0]?.name || '';\n    const lastEdited = page.last_edited_time?.substring(0, 10) || '';\n\n    // Skip archived\n    if (status === 'Archived') continue;\n\n    rawContext += `- \"${title}\"`;\n    if (app) rawContext += ` [${app}]`;\n    if (type) rawContext += ` | ${type}`;\n    if (pillar) rawContext += ` | ${pillar}`;\n    if (status) rawContext += ` | ${status}`;\n    if (initiativeStatus) rawContext += ` | Initiative: ${initiativeStatus}`;\n    if (owner) rawContext += ` | Owner: ${owner}`;\n    if (lastEdited) rawContext += ` | Edited: ${lastEdited}`;\n    rawContext += '\\n';\n\n    allPages.push({\n      id: page.id,\n      title,\n      type,\n      app,\n      pillar,\n      status,\n      owner,\n      lastEdited,\n      url: page.url\n    });\n  }\n}\n\n// Deduplicate by ID\nconst seen = new Set();\nallPages = allPages.filter(p => {\n  if (seen.has(p.id)) return false;\n  seen.add(p.id);\n  return true;\n});\n\nreturn [{\n  json: {\n    rawNotionData: rawContext || 'No Notion pages found.',\n    pages: allPages,\n    totalPages: allPages.length\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        208
+      ],
+      "id": "219cf7f3-680f-4f73-a6b9-9b18ee5367b4",
+      "name": "Notion: Extract Pages"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        880,
+        352
+      ],
+      "id": "daad1a93-f9d8-4b7c-8ff6-6e4b5832c62f",
+      "name": "Notion: Loop Over Pages"
+    },
+    {
+      "parameters": {
+        "jsCode": "const pages = $input.first().json.pages || [];\n\nif (pages.length === 0) {\n  return [{ json: { id: null, title: 'No pages', skip: true } }];\n}\n\nreturn pages.map(p => ({ json: p }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        208
+      ],
+      "id": "455acac9-4c46-40eb-a2de-5745e22c5d76",
+      "name": "Notion: Split Pages"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ad135f03-a1bf-4ac2-9f07-65a691a26775",
+              "leftValue": "=={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1184,
+        176
+      ],
+      "id": "ec34f2fb-4044-43b9-9308-948d4cfda3a3",
+      "name": "Notion: Has Page ID?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nlet collated = '=== Notion Page Content ===\\n';\nlet pageCount = 0;\n\nfor (const item of items) {\n  const title = item.json.pageTitle || '';\n  const type = item.json.pageType || '';\n  const app = item.json.pageApp || '';\n  const edited = item.json.lastEdited || '';\n  const content = item.json.content || '';\n  const url = item.json.pageUrl || '';\n\n  if (!content || content === 'No pages found.') continue;\n\n  collated += `\\n--- ${title} [${app}] (${type}) — edited ${edited} ---`;\n  collated += `\\nSource URL: ${url || 'Not available'}`;\n  collated += `\\n${content}\\n`;\n  pageCount++;\n}\n\nif (pageCount === 0) {\n  collated = '=== Notion Page Content ===\\nNo relevant pages found this week.';\n}\n\nreturn [{\n  json: {\n    notionFullContent: collated,\n    totalPages: pageCount\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1184,
+        0
+      ],
+      "id": "d141853c-4a1a-446c-a844-ca7e5525b808",
+      "name": "Notion: Collate Content"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0cb3dfd9-e536-4489-aa26-73f646190f08",
+              "name": "content ",
+              "value": "No pages found",
+              "type": "string"
+            },
+            {
+              "id": "76fc5b47-536e-468f-981f-677d61cb6c43",
+              "name": "pageTitle ",
+              "value": "No pages",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1248,
+        576
+      ],
+      "id": "f588385b-e667-48a5-9ad0-0b65e1b6b647",
+      "name": "Notion: No Page Placeholder"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.notion.com/v1/blocks/{{ $json.id }}/children?page_size=100",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1376,
+        176
+      ],
+      "id": "1dbe0067-4985-4d72-9a32-fe0477f7d8f5",
+      "name": "Notion: GET Page Content",
+      "credentials": {
+        "notionApi": {
+          "id": "bJLSXb7rDb4zr6O5",
+          "name": "Notion - Vatsalya"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst blocks = response.results || [];\n\nconst pageTitle = $('Notion: Loop Over Pages').first().json.title;\nconst pageType = $('Notion: Loop Over Pages').first().json.type;\nconst pageApp = $('Notion: Loop Over Pages').first().json.app;\nconst lastEdited = $('Notion: Loop Over Pages').first().json.lastEdited;\nconst pageId = $('Notion: Loop Over Pages').first().json.id;\nconst pageUrl = $('Notion: Loop Over Pages').first().json.url || '';\n\nlet text = '';\nconst toggleIds = [];\n\nfor (const block of blocks) {\n  const type = block.type;\n  const content = block[type];\n  if (!content) continue;\n\n  const richText = content.rich_text || [];\n  const blockText = richText.map(r => r.plain_text).join('');\n\n  if (type === 'toggle' && block.has_children) {\n    // Collect toggle header text + flag for child fetching\n    if (blockText.trim()) text += `\\n## ${blockText}\\n`;\n    toggleIds.push(block.id);\n    continue;\n  }\n\n  if (!blockText.trim()) continue;\n\n  if (type === 'heading_1') text += `\\n# ${blockText}\\n`;\n  else if (type === 'heading_2') text += `\\n## ${blockText}\\n`;\n  else if (type === 'heading_3') text += `\\n### ${blockText}\\n`;\n  else if (type === 'bulleted_list_item') text += `- ${blockText}\\n`;\n  else if (type === 'numbered_list_item') text += `- ${blockText}\\n`;\n  else if (type === 'paragraph') text += `${blockText}\\n`;\n  else if (type === 'callout') text += `> ${blockText}\\n`;\n  else if (type === 'quote') text += `\"${blockText}\"\\n`;\n  else if (type === 'synced_block') text += `[synced content]\\n`;\n}\n\nconst cleanText = text.replace(/\\n{3,}/g, '\\n\\n').trim();\nconst truncated = cleanText.length > 4000\n  ? cleanText.substring(0, 4000) + '\\n[truncated...]'\n  : cleanText;\n\nreturn [{\n  json: {\n    pageId,\n    pageTitle,\n    pageType,\n    pageApp,\n    lastEdited,\n    pageUrl,\n    content: truncated,\n    toggleIds,\n    hasToggles: toggleIds.length > 0,\n    charCount: cleanText.length\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        176
+      ],
+      "id": "7cf9a1c7-aaa5-40bd-a796-460c62817f66",
+      "name": "Notion: Parse Page Blocks"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1824,
+        352
+      ],
+      "id": "047048a7-bc83-4c04-b4e8-bfe043cb2216",
+      "name": "Notion: Merge Parsed Pages"
+    },
+    {
+      "parameters": {
+        "url": "https://api.notion.com/v1/blocks/3667013d07a48168b948d0fee1677a4e/children?page_size=100",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1424,
+        0
+      ],
+      "id": "9f11f2e0-59f9-4764-b1fb-c492da6da239",
+      "name": "Notion: Fetch Collector Prompt",
+      "credentials": {
+        "notionApi": {
+          "id": "bJLSXb7rDb4zr6O5",
+          "name": "Notion - Vatsalya"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const blocks = $('Notion: Fetch Collector Prompt').first().json.results || [];\nconst collated = $('Notion: Collate Content').first().json;\nconst config = $('Config: Notion Subflow').first().json;\n\nconst notionContent = collated.notionFullContent || 'No Notion content found.';\nconst dateToday = collated.dateToday || config.dateToday || '';\nconst dateLastMonday = collated.dateLastMonday || config.dateLastMonday || '';\n\n// Extract Collector Base Prompt\nlet collectorPrompt = '';\nlet inCollectorSection = false;\n\nfor (const block of blocks) {\n  if (block.type === 'heading_2') {\n    const text = block.heading_2?.rich_text?.[0]?.plain_text || '';\n    if (text.includes('Collector Base Prompt')) {\n      inCollectorSection = true;\n      continue;\n    }\n    if (inCollectorSection) break;\n  }\n  if (inCollectorSection && block.type === 'code') {\n    collectorPrompt = block.code?.rich_text?.map(r => r.plain_text).join('') || '';\n    break;\n  }\n}\n\nif (!collectorPrompt) {\n  collectorPrompt = 'ERROR: Collector Base Prompt not found in Prompt Library';\n}\n\nconst urlNote = '\\n\\nIMPORTANT: Each document section starts with \"Source URL:\". You MUST include this URL in the origin.url field for every signal extracted from that document. Never leave origin.url as null if a Source URL is present.\\n\\n';\n\nconst finalPrompt = collectorPrompt\n  .replace('[raw source data injected here]', urlNote + (collated.notionFullContent || 'No Notion content found.'))\n  .replace('[source_name]', 'notion');\n\nreturn [{\n  json: {\n    userMessage: finalPrompt,\n    totalPages: collated.totalPages || 0,\n    dateToday: config.dateToday,\n    dateLastMonday: config.dateLastMonday\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1632,
+        0
+      ],
+      "id": "c130be5c-2067-4813-8f46-060c5e86d686",
+      "name": "Notion: Build Collector Context"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 4000,\n  \"messages\": [{\n    \"role\": \"user\",\n    \"content\": $('Notion: Build Collector Context').first().json.userMessage\n  }]\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1840,
+        0
+      ],
+      "id": "3c8bdb33-27d9-4af0-92c1-1a757c475400",
+      "name": "Notion: Claude Collector",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "feoW1VBDikCNaQ3D",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst raw = response.content?.[0]?.text || '';\nconst context = $('Notion: Build Collector Context').first().json;\n\nconst clean = raw\n  .replace(/^```json\\n?/, '')\n  .replace(/\\n?```$/, '')\n  .trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(clean);\n} catch(e) {\n  parsed = {\n    source: 'notion',\n    signals: [],\n    itemCount: 0,\n    dateRange: `${context.dateLastMonday} to ${context.dateToday}`,\n    status: 'error',\n    error: e.message\n  };\n}\n\nconst output = {\n  source: parsed.source || 'notion',\n  signals: parsed.signals || [],\n  itemCount: parsed.itemCount || parsed.signals?.length || 0,\n  dateRange: parsed.dateRange || `${context.dateLastMonday} to ${context.dateToday}`,\n  status: parsed.status || (parsed.signals?.length > 0 ? 'success' : 'empty')\n};\n\nconsole.log(`Notion collector: ${output.signals.length} signals extracted`);\nconsole.log(`High: ${output.signals.filter(s => s.confidence === 'high').length}`);\nconsole.log(`Medium: ${output.signals.filter(s => s.confidence === 'medium').length}`);\n\nreturn [{ json: output }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2048,
+        0
+      ],
+      "id": "1ab79b01-3865-4db3-b967-40c35bbed00e",
+      "name": "Notion: Parse Collector Output"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2ee131f5-bfb6-432e-88f0-dc8fb8fb002e",
+              "name": "source",
+              "value": "={{ $json.source }}",
+              "type": "string"
+            },
+            {
+              "id": "f0076b8e-499e-4b00-8310-f12d172a9bc7",
+              "name": "signals",
+              "value": "={{ JSON.stringify($json.signals) }}",
+              "type": "array"
+            },
+            {
+              "id": "a8214fb0-6075-465a-a39c-8379c201d87c",
+              "name": "itemCount",
+              "value": "={{ $json.itemCount }}",
+              "type": "number"
+            },
+            {
+              "id": "7a2854fa-6b90-4fbe-abf8-05b20bce4d1c",
+              "name": "dateRange",
+              "value": "={{ $json.dateRange }}",
+              "type": "string"
+            },
+            {
+              "id": "0313aef7-5a0c-4d1c-bf14-5de17a7ceaec",
+              "name": "status",
+              "value": "={{ $json.status }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2256,
+        0
+      ],
+      "id": "b1fcbed4-0eeb-40aa-91e4-4671fdab2dda",
+      "name": "Output: Return Notion Signals"
+    },
+    {
+      "parameters": {
+        "content": "",
+        "height": 800,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        -112
+      ],
+      "id": "9f1f3638-be01-460d-a3fa-4b4c9825d6bd",
+      "name": "Sticky Note"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Input: Receive Trigger": {
+      "main": [
+        [
+          {
+            "node": "Config: Notion Subflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "L1: Notion Search — Analytics": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "L1: Notion Search — PRDs": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "L1: Notion Search — Customer": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "L1: Notion Search — Features": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Config: Notion Subflow": {
+      "main": [
+        [
+          {
+            "node": "L1: Notion Search — Analytics",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "L1: Notion Search — PRDs",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "L1: Notion Search — Customer",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "L1: Notion Search — Features",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Notion: Extract Pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion: Loop Over Pages": {
+      "main": [
+        [
+          {
+            "node": "Notion: Collate Content",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notion: Has Page ID?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notion: Merge Parsed Pages",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Notion: Extract Pages": {
+      "main": [
+        [
+          {
+            "node": "Notion: Split Pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion: Split Pages": {
+      "main": [
+        [
+          {
+            "node": "Notion: Loop Over Pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion: Has Page ID?": {
+      "main": [
+        [
+          {
+            "node": "Notion: GET Page Content",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notion: No Page Placeholder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion: GET Page Content": {
+      "main": [
+        [
+          {
+            "node": "Notion: Parse Page Blocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion: Parse Page Blocks": {
+      "main": [
+        [
+          {
+            "node": "Notion: Merge Parsed Pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion: No Page Placeholder": {
+      "main": [
+        []
+      ]
+    },
+    "Notion: Merge Parsed Pages": {
+      "main": [
+        [
+          {
+            "node": "Notion: Loop Over Pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion: Collate Content": {
+      "main": [
+        [
+          {
+            "node": "Notion: Fetch Collector Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion: Fetch Collector Prompt": {
+      "main": [
+        [
+          {
+            "node": "Notion: Build Collector Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion: Build Collector Context": {
+      "main": [
+        [
+          {
+            "node": "Notion: Claude Collector",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion: Claude Collector": {
+      "main": [
+        [
+          {
+            "node": "Notion: Parse Collector Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion: Parse Collector Output": {
+      "main": [
+        [
+          {
+            "node": "Output: Return Notion Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "579d7287-dade-4c1d-98c6-259d0feab187",
+  "meta": {
+    "instanceId": "589cc82bfaef6a48e49f76563ee242289190c24e109e0fc3320975755d230378"
+  },
+  "id": "UJ2916e0LUo2xb6m",
+  "tags": [
+    {
+      "updatedAt": "2026-05-26T10:36:36.032Z",
+      "createdAt": "2026-05-26T10:36:36.032Z",
+      "id": "FZk9ydkunMcZp3pU",
+      "name": "pages"
+    }
+  ]
+}

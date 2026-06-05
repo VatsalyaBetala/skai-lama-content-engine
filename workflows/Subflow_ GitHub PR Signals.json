@@ -1,0 +1,456 @@
+{
+  "name": "Subflow: GitHub PR Signals",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "dateToday"
+            },
+            {
+              "name": "dateLastMonday"
+            },
+            {
+              "name": "ts7DaysAgo",
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -16,
+        0
+      ],
+      "id": "03f9a8ef-872b-418c-88bc-9d346ebba59b",
+      "name": "Input: Receive Trigger"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "gh-repos",
+              "name": "repos",
+              "value": "=[\"VatsalyaBetala/PlantGuard\"]",
+              "type": "array"
+            },
+            {
+              "id": "gh-since",
+              "name": "since",
+              "value": "=2024-01-01T00:00:00Z",
+              "type": "string"
+            },
+            {
+              "id": "gh-today",
+              "name": "dateToday",
+              "value": "=2026-05-30",
+              "type": "string"
+            },
+            {
+              "id": "gh-monday",
+              "name": "dateLastMonday",
+              "value": "=2024-01-01",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        96
+      ],
+      "id": "0737dc9f-f508-4cf4-bb33-96dd74cd137d",
+      "name": "Config: GitHub Subflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const config = $input.first().json;\nconst repos = config.repos || ['skailama/kite-product-docs'];\n\nreturn repos.map(repo => ({\n  json: {\n    ...config,\n    repo\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        96
+      ],
+      "id": "be2474c9-63f9-4235-a4db-a7c7bf3acea4",
+      "name": "GH: Split Repos"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $json.repo }}/pulls",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "state",
+              "value": "closed"
+            },
+            {
+              "name": "sort",
+              "value": "updated"
+            },
+            {
+              "name": "direction",
+              "value": "desc"
+            },
+            {
+              "name": "per_page",
+              "value": "50"
+            },
+            {
+              "name": "base",
+              "value": "master"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        656,
+        96
+      ],
+      "id": "179be45e-99cd-424d-9723-7b50eb5a9807",
+      "name": "GH: Fetch PRs",
+      "alwaysOutputData": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "z3abkfYI6p1HBvep",
+          "name": "GitHub API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst config = $('Config: GitHub Subflow').first().json;\nconst since = new Date(config.since);\n\nlet allPRs = [];\n\nfor (const item of items) {\n  const repo = item.json._repo || config.repos?.[0] || 'skailama/kite-product-docs';\n  const prs = Array.isArray(item.json) ? item.json : [];\n\n  const merged = prs.filter(pr => {\n    if (!pr.merged_at) return false;\n    const mergedDate = new Date(pr.merged_at);\n    return mergedDate >= since;\n  });\n\n  console.log(`Repo ${repo}: ${prs.length} closed PRs, ${merged.length} merged since ${config.since}`);\n\n  for (const pr of merged) {\n    allPRs.push({\n      repo,\n      number: pr.number,\n      title: pr.title || '',\n      body: (pr.body || '').trim().substring(0, 1500),\n      labels: (pr.labels || []).map(l => l.name),\n      mergedAt: pr.merged_at,\n      url: pr.html_url,\n      author: pr.user?.login || '',\n      additions: pr.additions || 0,\n      deletions: pr.deletions || 0\n    });\n  }\n}\n\nconsole.log(`Total merged PRs this week: ${allPRs.length}`);\n\nreturn [{ json: { allPRs, prCount: allPRs.length } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        96
+      ],
+      "id": "f3b7d4ad-ad76-41f5-a748-3937fe6cb995",
+      "name": "GH: Filter Merged PRs"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst config = $('Config: GitHub Subflow').first().json;\nconst prs = data.allPRs || [];\n\nlet collated = '=== GitHub PR Signals ===\\n';\ncollated += `Period: ${config.dateLastMonday} to ${config.dateToday}\\n`;\ncollated += `Total merged PRs: ${prs.length}\\n\\n`;\n\nfor (const pr of prs) {\n  collated += `=== PR #${pr.number}: ${pr.title} ===\\n`;\n  collated += `Repo: ${pr.repo}\\n`;\n  collated += `Merged: ${pr.mergedAt?.split('T')[0]}\\n`;\n  collated += `Author: ${pr.author}\\n`;\n  if (pr.labels.length > 0) {\n    collated += `Labels: ${pr.labels.join(', ')}\\n`;\n  }\n  collated += `URL: ${pr.url}\\n`;\n  if (pr.body && pr.body.length > 0) {\n    collated += `\\nDescription:\\n${pr.body}\\n`;\n  }\n  collated += '\\n---\\n\\n';\n}\n\nif (prs.length === 0) {\n  collated += 'No merged PRs found this week.\\n';\n}\n\nreturn [{\n  json: {\n    githubContent: collated,\n    prCount: prs.length,\n    dateToday: config.dateToday,\n    dateLastMonday: config.dateLastMonday\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        96
+      ],
+      "id": "767cfd16-3ec9-4433-b539-3fea6d04275e",
+      "name": "GH: Collate PR Content"
+    },
+    {
+      "parameters": {
+        "url": "https://api.notion.com/v1/blocks/3667013d07a48168b948d0fee1677a4e/children?page_size=100",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1328,
+        96
+      ],
+      "id": "d4186ec0-75a2-4b67-a873-aa20950add20",
+      "name": "GH: Fetch Collector Prompt",
+      "credentials": {
+        "notionApi": {
+          "id": "bJLSXb7rDb4zr6O5",
+          "name": "Notion - Vatsalya"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const blocks = $('GH: Fetch Collector Prompt').first().json.results || [];\nconst collated = $('GH: Collate PR Content').first().json;\n\nlet collectorPrompt = '';\nlet inCollectorSection = false;\n\nfor (const block of blocks) {\n  if (block.type === 'heading_2') {\n    const text = block.heading_2?.rich_text?.[0]?.plain_text || '';\n    if (text.includes('GitHub Collector Prompt')) {\n      inCollectorSection = true;\n      continue;\n    }\n    if (inCollectorSection) break; // ← moved OUTSIDE the heading_2 check\n  }\n  if (inCollectorSection && block.type === 'code') {\n    collectorPrompt = block.code?.rich_text?.map(r => r.plain_text).join('') || '';\n    break;\n  }\n}\n\nif (!collectorPrompt) {\n  collectorPrompt = 'ERROR: GitHub Collector Prompt not found in Prompt Library';\n}\n\nconst finalPrompt = collectorPrompt\n  .replace('[raw source data injected here]', collated.githubContent || 'No GitHub PR data found.')\n  .replace('[source_name]', 'github');\n\nreturn [{\n  json: {\n    userMessage: finalPrompt,\n    prCount: collated.prCount,\n    dateToday: collated.dateToday,\n    dateLastMonday: collated.dateLastMonday\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1552,
+        96
+      ],
+      "id": "8e25c940-7d40-49fe-8859-9a9aab9ed2f2",
+      "name": "GH: Build Collector Context"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\"model\": \"claude-haiku-4-5-20251001\", \"max_tokens\": 4000, \"messages\": [{\"role\": \"user\", \"content\": $json.userMessage}]}) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1776,
+        96
+      ],
+      "id": "159b9b33-2127-4a21-b920-57d54aeeae19",
+      "name": "GH: Claude Collector",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "feoW1VBDikCNaQ3D",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst context = $('GH: Build Collector Context').first().json;\n\nconst raw = response.content?.[0]?.text || '';\n\nconst clean = raw\n  .replace(/^```json\\n?/, '')\n  .replace(/\\n?```$/, '')\n  .trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(clean);\n} catch(e) {\n  console.log('Parse error:', e.message);\n  parsed = {\n    source: 'github',\n    signals: [],\n    itemCount: 0,\n    dateRange: `${context.dateLastMonday} to ${context.dateToday}`,\n    status: 'error',\n    error: e.message,\n    rawOutput: raw.substring(0, 500)\n  };\n}\n\nconst signals = parsed.signals || [];\nconsole.log(`GitHub collector: ${signals.length} signals extracted from ${context.prCount} PRs`);\n\nreturn [{\n  json: {\n    source: 'github',\n    signals,\n    itemCount: signals.length,\n    prCount: context.prCount,\n    dateRange: `${context.dateLastMonday} to ${context.dateToday}`,\n    status: parsed.status || 'success'\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        96
+      ],
+      "id": "f2350619-02aa-4ab8-ace0-d86b7a677ec2",
+      "name": "GH: Parse Collector Output"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "gh-out-source",
+              "name": "source",
+              "value": "=github",
+              "type": "string"
+            },
+            {
+              "id": "gh-out-signals",
+              "name": "signals",
+              "value": "={{ $json.signals }}",
+              "type": "array"
+            },
+            {
+              "id": "gh-out-count",
+              "name": "itemCount",
+              "value": "={{ $json.itemCount }}",
+              "type": "number"
+            },
+            {
+              "id": "gh-out-range",
+              "name": "dateRange",
+              "value": "={{ $json.dateRange }}",
+              "type": "string"
+            },
+            {
+              "id": "gh-out-status",
+              "name": "status",
+              "value": "={{ $json.status }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2224,
+        96
+      ],
+      "id": "79548b53-ea1d-4525-a256-4b157d643c7d",
+      "name": "Output: Return GitHub Signals"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        192
+      ],
+      "id": "610b7ac3-bb33-49a9-b22a-6dbd47a54389",
+      "name": "When clicking ‘Execute workflow’"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Input: Receive Trigger": {
+      "main": [
+        [
+          {
+            "node": "Config: GitHub Subflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config: GitHub Subflow": {
+      "main": [
+        [
+          {
+            "node": "GH: Split Repos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GH: Split Repos": {
+      "main": [
+        [
+          {
+            "node": "GH: Fetch PRs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GH: Fetch PRs": {
+      "main": [
+        [
+          {
+            "node": "GH: Filter Merged PRs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GH: Filter Merged PRs": {
+      "main": [
+        [
+          {
+            "node": "GH: Collate PR Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GH: Collate PR Content": {
+      "main": [
+        [
+          {
+            "node": "GH: Fetch Collector Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GH: Fetch Collector Prompt": {
+      "main": [
+        [
+          {
+            "node": "GH: Build Collector Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GH: Build Collector Context": {
+      "main": [
+        [
+          {
+            "node": "GH: Claude Collector",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GH: Claude Collector": {
+      "main": [
+        [
+          {
+            "node": "GH: Parse Collector Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GH: Parse Collector Output": {
+      "main": [
+        [
+          {
+            "node": "Output: Return GitHub Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Config: GitHub Subflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "b0888232-04a6-40bd-9414-f1dd3c90ef85",
+  "meta": {
+    "instanceId": "589cc82bfaef6a48e49f76563ee242289190c24e109e0fc3320975755d230378"
+  },
+  "id": "w9EqxxAMSEbVXTxv",
+  "tags": []
+}
